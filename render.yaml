@@ -1,0 +1,15 @@
+services:
+  - type: web
+    name: financial-trading-system-simulator
+    runtime: node
+    plan: free
+    buildCommand: echo "no build step, zero dependencies"
+    startCommand: node server.js
+    healthCheckPath: /healthz
+    envVars:
+      # Change this before you deploy. Anyone with it can drive the market.
+      - key: ADMIN_PASS
+        value: changeme
+      # Set to 1 only if you want several devices sharing one team code.
+      - key: ALLOW_MULTI
+        value: "0"

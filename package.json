@@ -1,0 +1,16 @@
+{
+  "name": "financial-trading-system-simulator",
+  "version": "1.0.0",
+  "description": "Financial Trading System Simulator. Hedge fund trading simulation for teams: equities, options, futures, swaps and CDS across a live 7-round session.",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {},
+  "private": true,
+  "author": "Tarush Bhusri",
+  "license": "UNLICENSED"
+}

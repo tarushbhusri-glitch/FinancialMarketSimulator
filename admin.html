@@ -1,0 +1,392 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Financial Trading System Simulator · Facilitator Console</title>
+<!--
+Copyright (c) 2026 Tarush Bhusri. All rights reserved.
+
+This software and its accompanying materials are the exclusive property of
+Tarush Bhusri. Unauthorised use, reproduction, modification, distribution,
+public display or derivative work, in whole or in part, is strictly prohibited
+without the prior written permission of the copyright holder. Violations will be
+pursued to the fullest extent of applicable law, including civil action and
+criminal prosecution where available.
+-->
+<style>
+:root{--bg:#0a0e14;--panel:#111721;--panel2:#161d2a;--line:#1f2937;--txt:#dbe4f0;
+--dim:#7d8ba1;--acc:#4da3ff;--up:#2ecc8f;--dn:#ff5c72;--warn:#ffb020;
+--mono:'SF Mono',ui-monospace,'Cascadia Mono',Menlo,Consolas,monospace}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--txt);font:13px/1.45 var(--mono)}
+button{font:inherit;cursor:pointer;border:0;border-radius:5px}
+input,select{font:inherit;background:#0b111a;color:var(--txt);border:1px solid var(--line);
+border-radius:4px;padding:7px 9px;outline:none}
+.up{color:var(--up)}.dn{color:var(--dn)}.dim{color:var(--dim)}.warn{color:var(--warn)}
+
+#gate{position:fixed;inset:0;background:var(--bg);display:grid;place-items:center;z-index:99}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:34px 38px;width:360px}
+.card h1{font-size:24px;letter-spacing:.14em;margin-bottom:6px;font-weight:600}
+.card p{color:var(--dim);font-size:11.5px;margin-bottom:20px}
+.card input{width:100%}
+.card button{width:100%;margin-top:18px;background:var(--acc);color:#04101f;padding:11px;font-weight:700}
+
+header{display:flex;align-items:center;gap:14px;padding:11px 16px;background:var(--panel);
+border-bottom:1px solid var(--line);flex-wrap:wrap;position:sticky;top:0;z-index:20}
+.brand{font-weight:700;letter-spacing:.16em;font-size:12px;color:var(--acc)}
+.pill{background:var(--panel2);border:1px solid var(--line);border-radius:20px;padding:4px 11px;font-size:11px}
+.pill span{color:var(--dim)}
+#clk{font-size:22px;font-weight:700}
+.grow{flex:1}
+header button{padding:8px 14px;font-size:11.5px;letter-spacing:.06em;font-weight:600}
+.b1{background:var(--acc);color:#04101f}.b2{background:var(--panel2);color:var(--txt);border:1px solid var(--line)}
+.b3{background:#3a1a22;color:var(--dn)}
+.b4{background:#2a2340;color:#b39df}
+.botrow{opacity:.72}
+.bottag{font-size:9px;letter-spacing:.06em;color:#b39df;background:#241f36;
+  padding:1px 5px;border-radius:3px;margin-left:6px}
+
+.wrap{display:grid;grid-template-columns:1fr 330px;gap:12px;padding:12px;align-items:start}
+@media(max-width:1000px){.wrap{grid-template-columns:1fr}}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:8px;overflow:hidden;margin-bottom:12px}
+.ph{padding:8px 13px;background:var(--panel2);border-bottom:1px solid var(--line);
+font-size:10.5px;letter-spacing:.14em;color:var(--dim);display:flex;gap:10px;align-items:center}
+.pb{padding:12px 13px}
+table{width:100%;border-collapse:collapse;font-size:12px}
+th{text-align:right;padding:6px 9px;color:var(--dim);font-size:10px;letter-spacing:.1em;
+font-weight:500;border-bottom:1px solid var(--line);white-space:nowrap}
+th:first-child,td:first-child{text-align:left}
+td{text-align:right;padding:6px 9px;border-bottom:1px solid #151c27;white-space:nowrap}
+tbody tr:hover{background:#141b26}
+.dot{width:7px;height:7px;border-radius:50%;display:inline-block;margin-right:6px;background:#33415a}
+.dot.on{background:var(--up)}
+.nx{padding:12px 13px;background:#12202f;border-bottom:1px solid var(--line)}
+.nx h4{font-size:13px;margin:3px 0 4px}
+.nx .r{font-size:9.5px;color:var(--acc);letter-spacing:.1em}
+.logline{padding:4px 13px;font-size:11px;border-bottom:1px solid #151c27;color:var(--dim)}
+.logline b{color:var(--txt)}
+.mono-row{display:flex;justify-content:space-between;padding:4px 0;font-size:11.5px}
+</style></head><body>
+
+<div id="gate"><div class="card">
+  <h1>FACILITATOR</h1><p>Financial Trading System Simulator<br>control room</p>
+  <input id="gp" type="password" placeholder="Passcode" onkeydown="if(event.key==='Enter')gate()">
+  <button onclick="gate()">UNLOCK</button>
+  <p id="gerr" style="color:var(--dn);margin-top:12px;display:none">Incorrect passcode.</p>
+  <p style="color:#5a6a80;font-size:9.5px;margin-top:20px;line-height:1.6;
+            border-top:1px solid var(--line);padding-top:14px">
+    © 2026 Tarush Bhusri. All rights reserved.<br>
+    Unauthorised use, reproduction or distribution of this software, in whole or in
+    part, is prohibited and will be prosecuted.
+  </p>
+</div></div>
+
+<header>
+  <span class="brand">FTS · CONTROL</span>
+  <span class="pill"><span>ROUND</span> <b id="hR">0/10</b></span>
+  <span class="pill"><span>PHASE</span> <b id="hP">—</b></span>
+  <span id="clk">--:--</span>
+  <span class="grow"></span>
+  <button class="b1" onclick="act('next')">▶ ADVANCE ROUND</button>
+  <button class="b2" onclick="act('open')">OPEN</button>
+  <button class="b2" onclick="act('close')">CLOSE</button>
+  <button class="b2" onclick="act('extend')">+1 MIN</button>
+  <button class="b2" id="pauseBtn" onclick="act('pause')">⏸ PAUSE TICKS</button>
+  <button class="b4" id="demoBtn" onclick="demo()">🤖 DEMO FILL</button>
+  <button class="b2" id="begBtn" onclick="act('beginner')">BEGINNER: OFF</button>
+  <button class="b2" onclick="exportCsv()">EXPORT CSV</button>
+  <button class="b2" onclick="backup()">BACKUP</button>
+  <button class="b2" onclick="document.getElementById('rf').click()">RESTORE</button>
+  <input id="rf" type="file" accept=".json" style="display:none" onchange="restore(this)">
+  <button class="b3" onclick="if(confirm('Reset the entire game? All team books are wiped.'))act('reset')">RESET</button>
+</header>
+
+<div class="wrap">
+ <div>
+  <div class="panel"><div class="ph">NEXT EVENT (not yet released to teams)</div>
+    <div class="nx"><div class="r">ROUND <span id="nxr">1</span></div><h4 id="nxh">—</h4></div>
+  </div>
+
+  <div class="panel"><div class="ph">SESSION SCENARIO <span class="grow"></span>
+    <span id="modeLbl" class="dim" style="font-size:9px"></span></div>
+    <div class="pb">
+      <div style="display:flex;gap:7px;flex-wrap:wrap;align-items:center;margin-bottom:9px">
+        <select id="camp" onchange="setCampaign()" style="flex:1;min-width:220px;font-size:11.5px"></select>
+        <button class="b2" style="padding:7px 12px;font-size:11px" onclick="act('randomise')">🎲 RANDOMISE</button>
+      </div>
+      <p id="campDesc" class="dim" style="font-size:10.5px;line-height:1.5;margin-bottom:10px"></p>
+      <table id="roundList"></table>
+      <p class="dim" style="font-size:10px;margin-top:8px">Click any round to swap in a different event from the 100-event library. Rounds already played cannot be changed.</p>
+    </div>
+  </div>
+
+  <div class="panel"><div class="ph">PUSH A HEADLINE <span class="grow"></span>
+    <span class="dim" style="font-size:9px">goes straight to the chosen desks</span></div>
+    <div class="pb">
+      <input id="pushText" placeholder="e.g. Rumour: Atlas is in emergency talks with regulators" maxlength="400" style="width:100%">
+      <div style="display:flex;gap:7px;margin-top:8px;flex-wrap:wrap">
+        <select id="pushTo" style="font-size:11.5px"><option value="ALL">Every team</option></select>
+        <select id="pushRole" style="font-size:11.5px">
+          <option value="">Whole desk</option>
+          <option value="EQUITY">Equity analysts</option>
+          <option value="MACRO">Macro analysts</option>
+          <option value="CREDIT">Credit analyst</option>
+          <option value="DERIV">Derivatives</option>
+        </select>
+        <button class="b1" style="padding:7px 14px;font-size:11px" onclick="pushNews()">PUSH</button>
+        <button class="b2" style="padding:7px 12px;font-size:11px" onclick="act('clearpush')">CLEAR</button>
+      </div>
+    </div>
+  </div>
+  <div class="panel">
+    <div class="ph">TEAM MONITOR <span class="grow"></span><span id="cnt" class="dim"></span></div>
+    <table id="tm"></table>
+  </div>
+  <div class="panel"><div class="ph">SCORECARD (live)</div><table id="sc"></table></div>
+  <div class="panel"><div class="ph">TOP INDIVIDUALS <span class="grow"></span>
+    <span class="dim" style="font-size:9px">across every desk</span></div>
+    <table id="ppl"></table>
+  </div>
+ </div>
+
+ <div>
+  <div class="panel"><div class="ph">MARKET STATE <span class="grow"></span>
+    <span id="liveLbl" class="up" style="font-size:9px"></span></div>
+    <div class="pb" id="ms"></div></div>
+  <div class="panel"><div class="ph">INFORMATION ASYMMETRY</div><div class="pb">
+    <div style="display:flex;gap:4px;margin-bottom:8px">
+      <button class="b2 nm" data-m="same" style="flex:1;padding:7px;font-size:10.5px" onclick="newsMode('same')">IDENTICAL</button>
+      <button class="b2 nm" data-m="role" style="flex:1;padding:7px;font-size:10.5px" onclick="newsMode('role')">BY ROLE</button>
+      <button class="b2 nm" data-m="full" style="flex:1;padding:7px;font-size:10.5px" onclick="newsMode('full')">FULLY SPLIT</button>
+    </div>
+    <p id="nmDesc" class="dim" style="font-size:10.5px;line-height:1.5"></p>
+  </div></div>
+  <div class="panel"><div class="ph">TIMING</div><div class="pb">
+    <div class="mono-row"><span class="dim">Mode</span><b id="tmode">auto</b></div>
+    <div class="mono-row"><span class="dim">Next round window</span><b id="tnext">—</b></div>
+    <div class="mono-row"><span class="dim">Trading time total</span><b id="ttot">—</b></div>
+    <div class="mono-row"><span class="dim">Elapsed since start</span><b id="tela">—</b></div>
+    <div style="display:flex;gap:7px;margin-top:10px">
+      <input id="rl" type="number" value="6" min="1" max="30" style="width:64px"><span class="dim" style="align-self:center;font-size:11px">min</span>
+      <button class="b2" style="padding:7px 10px;font-size:11px" onclick="setLen()">OVERRIDE</button>
+      <button class="b2" style="padding:7px 10px;font-size:11px" onclick="act('autolen')">AUTO</button>
+    </div>
+    <p class="dim" style="font-size:10.5px;margin-top:8px">Auto gives each round its scripted window (6/5/5/6/6/5/4). Override fixes every remaining round to one length.</p>
+  </div></div>
+  <div class="panel"><div class="ph">CURRENT HEADLINE</div><div id="news"></div></div>
+  <div class="panel"><div class="ph">TRADE TAPE</div><div id="log" style="max-height:340px;overflow:auto"></div></div>
+ </div>
+</div>
+
+<script>
+let P='',D=null;
+const fmt=(n,d=2)=>n==null||!isFinite(n)?'—':n.toLocaleString('en-US',{minimumFractionDigits:d,maximumFractionDigits:d});
+const usd=n=>(n<0?'-':'')+'$'+Math.abs(n).toLocaleString('en-US',{maximumFractionDigits:0});
+const cls=n=>n>0?'up':n<0?'dn':'dim';
+const sgn=n=>(n>0?'+':'')+fmt(n);
+
+async function call(a,extra){
+  const r=await fetch('/api/admin',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({pass:P,action:a,...(extra||{})})});
+  return r.json();
+}
+async function gate(){
+  P=document.getElementById('gp').value;
+  const d=await call('');
+  if(!d.ok){document.getElementById('gerr').style.display='block';return;}
+  sessionStorage.setItem('mcc_pass',P);
+  document.getElementById('gate').style.display='none';
+  D=d;draw();setInterval(tick,2000);
+}
+async function tick(){const d=await call('');if(d.ok){D=d;draw();}}
+async function act(a){const d=await call(a);if(d.ok){D=d;draw();}}
+async function setLen(){const m=Number(document.getElementById('rl').value)||5;
+  const d=await call('length',{secs:m*60});if(d.ok){D=d;draw();}}
+function exportCsv(){window.open('/api/export?pass='+encodeURIComponent(P),'_blank');}
+
+async function backup(){
+  const r=await fetch('/api/backup',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({pass:P})});
+  const d=await r.json();
+  if(!d.ok){alert('Backup failed.');return;}
+  const url=URL.createObjectURL(new Blob([JSON.stringify(d)],{type:'application/json'}));
+  const a=document.createElement('a');
+  a.href=url; a.download=`fts-session-r${D?D.round:0}-${new Date().toISOString().slice(11,16).replace(':','')}.json`;
+  a.click(); URL.revokeObjectURL(url);
+}
+async function restore(input){
+  const f=input.files[0]; if(!f)return;
+  if(!confirm('Restore this backup? Every current book is replaced.')){input.value='';return;}
+  const txt=await f.text(); input.value='';
+  const r=await fetch('/api/restore',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({pass:P,data:txt})});
+  const d=await r.json();
+  alert(d.msg||(d.ok?'Restored.':'Restore failed.'));
+  if(d.ok) tick();
+}
+function setCampaign(){ act('campaign',{campaign:document.getElementById('camp').value}); }
+function newsMode(m){ act('newsmode',{mode:m}); }
+async function act2(a,x){ const d=await call(a,x); if(d.ok){D=d;draw();} }
+async function pushNews(){
+  const text=document.getElementById('pushText').value.trim();
+  if(!text){alert('Write a headline first.');return;}
+  await call('push',{text,to:document.getElementById('pushTo').value,
+                     role:document.getElementById('pushRole').value});
+  document.getElementById('pushText').value='';
+  tick();
+}
+function swapRound(idx){
+  if(idx < D.round){ alert('That round has already been played.'); return; }
+  const byCat={};
+  D.library.forEach(s=>{ (byCat[s.cat]=byCat[s.cat]||[]).push(s); });
+  const list=Object.entries(byCat).map(([c,arr])=>
+    c.toUpperCase()+'\n'+arr.map(s=>'  '+s.id+'  '+s.h.slice(0,58)).join('\n')).join('\n\n');
+  const pick=prompt('Round '+(idx+1)+': type a scenario ID.\n\n'+list, D.rounds[idx].id);
+  if(pick) act2('setround',{idx,scenario:pick.trim().toUpperCase()});
+}
+
+async function demo(){
+  if(D&&D.demoActive){
+    if(!confirm('Remove the 16 demo funds and reset their books? Real teams are untouched.'))return;
+    const d=await call('cleardemo'); if(d.ok){D=d;draw();}
+    return;
+  }
+  if(!confirm('Fill TEAM02 through TEAM17 with 16 demo funds?\n\nThey trade automatically every round using different strategies. TEAM01 stays free for you. Any team that has already joined for real is left alone.'))return;
+  const d=await call('demo');
+  if(d.ok){D=d;draw();
+    alert(`${d.demoFilled} demo funds added. Log in as TEAM01 and press ADVANCE ROUND.`);}
+}
+async function release(code,name){
+  if(!confirm(`Release the seat for ${name||code}? Their book is kept, but the device currently logged in will be signed out and any device can then claim the code.`))return;
+  const d=await call('release',{team:code}); if(d.ok){D=d;draw();}
+}
+
+function draw(){
+  document.getElementById('hR').textContent=D.round+'/'+D.maxRounds;
+  const ph=D.phase==='open'?'OPEN':D.phase==='closed'?'CLOSED':D.phase==='ended'?'FINAL':'PRE-OPEN';
+  const e=document.getElementById('hP');e.textContent=ph;
+  e.className=D.phase==='open'?'up':D.phase==='ended'?'warn':'dn';
+  const m=Math.floor(D.secsLeft/60),s=D.secsLeft%60;
+  const c=document.getElementById('clk');
+  c.textContent=D.phase==='open'?`${m}:${String(s).padStart(2,'0')}`:'--:--';
+  c.className=D.secsLeft<60&&D.phase==='open'?'dn':'';
+  const tm=document.getElementById('tmode');
+  tm.textContent=D.lengthOverride?'manual override':'auto (per round)';
+  tm.className=D.lengthOverride?'warn':'up';
+  document.getElementById('tnext').textContent=D.round<D.maxRounds
+    ?(D.lengthOverride?Math.round(D.roundLengthSec/60):D.nextMins)+' min':'—';
+  document.getElementById('ttot').textContent=D.totalMins+' min across '+D.maxRounds+' rounds';
+  document.getElementById('tela').textContent=D.elapsedMins!=null?D.elapsedMins+' min':'—';
+  if(!D.lengthOverride) document.getElementById('rl').value=D.nextMins||6;
+  document.getElementById('nxr').textContent=Math.min(D.round+1,D.maxRounds);
+  document.getElementById('nxh').textContent=D.nextHeadline;
+
+  document.getElementById('ms').innerHTML=[
+    ['Index',fmt(D.market.index,1)],['5y swap rate',fmt(D.market.rate5y,2)+'%'],
+    ['2y swap rate',fmt(D.market.rate2y,2)+'%'],['HY spread',Math.round(D.market.hy)+'bp'],
+    ['IG spread',Math.round(D.market.ig)+'bp']
+  ].map(([k,v])=>`<div class="mono-row"><span class="dim">${k}</span><b>${v}</b></div>`).join('');
+
+  const T=D.teams;
+  const bots=T.filter(t=>t.bot).length;
+  const seated=T.reduce((a,t)=>a+(t.bot?0:t.seated||0),0);
+  document.getElementById('cnt').textContent=
+    seated+' people seated · '+T.filter(t=>t.joined&&!t.bot).length+'/17 teams'
+    +(bots?' · '+bots+' demo':'');
+  const db=document.getElementById('demoBtn');
+  db.textContent=D.demoActive?'🤖 CLEAR DEMO':'🤖 DEMO FILL';
+  const bb=document.getElementById('begBtn');
+  bb.textContent='BEGINNER: '+(D.beginner?'ON':'OFF');
+  bb.className=D.beginner?'b1':'b2';
+
+  // live tick indicator
+  document.getElementById('liveLbl').textContent = D.paused?'':'LIVE · '+(D.tickMs/1000)+'s tick';
+  document.getElementById('liveLbl').className = D.paused?'warn':'up';
+  const pb=document.getElementById('pauseBtn');
+  pb.textContent = D.paused?'▶ RESUME TICKS':'⏸ PAUSE TICKS';
+  pb.className = D.paused?'b1':'b2';
+
+  // campaign picker
+  const cs=document.getElementById('camp');
+  if(cs.options.length!==(D.campaigns||[]).length){
+    cs.innerHTML=(D.campaigns||[]).map(c=>`<option value="${c.id}">${c.name}</option>`).join('');
+  }
+  cs.value=D.campaignId||'CLASSIC';
+  const cd=(D.campaigns||[]).find(c=>c.id===cs.value);
+  document.getElementById('campDesc').textContent=cd?cd.desc:'';
+  document.getElementById('modeLbl').textContent=(D.mode||'campaign').toUpperCase()+' MODE';
+
+  document.getElementById('roundList').innerHTML=
+    `<tbody>`+(D.rounds||[]).map(r=>{
+      const played=r.idx<D.round, now=r.idx===D.round-1;
+      return `<tr style="cursor:${played?'default':'pointer'};opacity:${played?0.45:1}"
+        ${played?'':`onclick="swapRound(${r.idx})"`}>
+        <td class="dim" style="width:34px">R${r.idx+1}</td>
+        <td>${now?'<span class="up">▶ </span>':''}${r.name||r.id}</td>
+        <td class="dim" style="text-align:right;font-size:10px">${(r.cat||'').toUpperCase()}</td></tr>`;
+    }).join('')+`</tbody>`;
+
+  // news asymmetry
+  [...document.querySelectorAll('.nm')].forEach(b=>
+    b.className='b'+(b.dataset.m===D.newsMode?'1':'2')+' nm');
+  document.getElementById('nmDesc').textContent={
+    same:'Every analyst on every desk receives identical research. Fairest, but removes the information advantage inside a team.',
+    role:'Each role gets its own research, identical across teams. Asymmetry within a desk, fairness between desks. The default.',
+    full:'Every team gets a different draw, so desk 3 may know something desk 7 does not. Most realistic, hardest to debrief fairly.'
+  }[D.newsMode||'role'];
+
+  // push targets
+  const pt=document.getElementById('pushTo');
+  if(pt.options.length!==T.length+1){
+    pt.innerHTML='<option value="ALL">Every team</option>'+
+      T.filter(t=>!t.bot).map(t=>`<option value="${t.code}">${t.name||t.code}</option>`).join('');
+  }
+
+  const P=(D.people||[]).slice(0,12);
+  document.getElementById('ppl').innerHTML=P.length
+    ? `<thead><tr><th>#</th><th>PERSON</th><th>TEAM</th><th>ROLE</th><th>CALLS</th><th>IDEAS USED</th><th>PTS</th></tr></thead><tbody>`+
+      P.map((p,i)=>`<tr><td class="dim">${i+1}</td>
+        <td>${p.doneThisRound?'<span class="up">●</span> ':'<span class="dim">○</span> '}${p.person}</td>
+        <td class="dim">${p.fund||p.team}</td><td class="dim">${p.roles}</td>
+        <td><span class="up">${p.right}</span>/<span class="dn">${p.wrong}</span></td>
+        <td class="dim">${p.filled||'—'}</td><td><b>${p.points}</b></td></tr>`).join('')+`</tbody>`
+    : '<tbody><tr><td class="dim" style="padding:18px;text-align:center">Nobody seated yet.</td></tr></tbody>';
+  document.getElementById('tm').innerHTML=
+    `<thead><tr><th>TEAM</th><th>SEATS</th><th>QUEUE</th><th>NAV</th><th>RET</th><th>GROSS</th><th>NET</th><th>VEGA</th><th>BRCH</th><th>TRDS</th><th>MEMO</th><th></th></tr></thead><tbody>`+
+    T.map(t=>`<tr class="${t.bot?'botrow':''}">
+      <td><span class="dot ${t.online?'on':''}"></span>${t.joined?(t.name||t.code):'<span class="dim">'+t.code+' (empty)</span>'}${t.bot?`<span class="bottag" title="${t.strategy}">DEMO</span>`:''}</td>
+      <td class="${t.bot?'dim':t.rolesHeld===t.seatsMax?'up':t.seated?'':'dim'}" title="${t.seated||0} people covering ${t.rolesHeld||0} seats">${t.bot?'bot':(t.seated||0)+'p / '+(t.rolesHeld||0)+'s'}${t.noPM?' <span class="warn">no PM</span>':''}</td>
+      <td class="${t.pending>6?'dn':t.pending?'warn':'dim'}">${t.pending||'—'}</td>
+      <td class="${cls(t.ret)}">${t.joined?usd(t.nav):'—'}</td>
+      <td class="${cls(t.ret)}">${t.joined?sgn(t.ret*100)+'%':'—'}</td>
+      <td class="${t.gross>4?'dn':'dim'}">${t.joined?fmt(t.gross,2)+'x':'—'}</td>
+      <td class="dim">${t.joined?sgn(t.net)+'x':'—'}</td>
+      <td class="dim">${t.joined?usd(t.vega):'—'}</td>
+      <td class="${t.breaches?'dn':'dim'}">${t.breaches||'—'}</td>
+      <td class="dim">${t.trades||'—'}</td>
+      <td class="${t.memo?'up':'dim'}">${t.memo?'✓':'—'}</td>
+      <td>${t.bot ? '<span class="dim">bot</span>' : t.claimed
+        ?`<button class="b2" style="padding:2px 8px;font-size:10.5px" onclick='release(${JSON.stringify(t.code)},${JSON.stringify(t.name||'')})'>RELEASE</button>`
+        :'<span class="dim">free</span>'}</td></tr>`).join('')+`</tbody>`;
+
+  document.getElementById('sc').innerHTML=
+    `<thead><tr><th>#</th><th>TEAM</th><th>RET</th><th>SHARPE</th><th>MAX DD</th><th>P&L/40</th><th>SHP/25</th><th>RSK/20</th><th>MEM/15</th><th>TOTAL</th></tr></thead><tbody>`+
+    D.scores.map((s,i)=>`<tr><td class="dim">${i+1}</td><td>${s.name||s.code}</td>
+      <td class="${cls(s.ret)}">${sgn(s.ret*100)}%</td><td>${fmt(s.sharpe,2)}</td>
+      <td class="dn">${fmt(s.maxDD*100,1)}%</td>
+      <td class="dim">${fmt(s.sPnl,1)}</td><td class="dim">${fmt(s.sSharpe,1)}</td>
+      <td class="dim">${fmt(s.sRisk,1)}</td><td class="dim">${fmt(s.sMemo,1)}</td>
+      <td><b class="${i===0?'up':''}">${fmt(s.total,1)}</b></td></tr>`).join('')+`</tbody>`;
+
+  document.getElementById('news').innerHTML=D.news.length
+    ? D.news.slice(0,2).map(n=>`<div class="nx"><div class="r">ROUND ${n.round}</div><h4>${n.headline}</h4>
+        <p class="dim" style="font-size:11px">${n.body}</p></div>`).join('')
+    : '<div class="pb dim">No news released yet.</div>';
+
+  document.getElementById('log').innerHTML=D.log.map(l=>
+    `<div class="logline"><b>${l.name||l.team}</b> ${l.msg}</div>`).join('')
+    ||'<div class="pb dim">No trades yet.</div>';
+}
+
+const sp=sessionStorage.getItem('mcc_pass');
+if(sp){document.getElementById('gp').value=sp;gate();}
+</script></body></html>
