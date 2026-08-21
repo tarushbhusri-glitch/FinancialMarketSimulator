@@ -335,6 +335,7 @@ function freshTeam(code){
   return {
     code, name:'', joined:false, bot:false, strategy:null,
     seats:{},            // token -> {role, person, lastSeen}
+    roundLog:[],         // scribe's per-round decision log, separate from the memo
     ideas:[],            // the desk's ticket queue
     ideaSeq:1,
     cash: START_CAP, positions:{}, realized:0,
@@ -585,6 +586,7 @@ function migrate(st){
     if(!t.ideaSeq) t.ideaSeq = (t.ideas.reduce((a,i)=>Math.max(a,i.id||0),0)) + 1;
     if(!Array.isArray(t.navHistory) || !t.navHistory.length) t.navHistory = [START_CAP];
     if(!Array.isArray(t.pushed)) t.pushed = [];
+    if(!Array.isArray(t.roundLog)) t.roundLog = [];
   }
   if(!st.bookVersion) st.bookVersion = 1;
   if(!st.rounds || !st.rounds.length) st.rounds = buildRounds('campaign','CLASSIC');
@@ -1204,7 +1206,10 @@ function scoreTeam(t){
   const sPnl    = Math.max(0, Math.min(40, 20 + ret*130));            // 40 pts, 0% ret = 20
   const sSharpe = Math.max(0, Math.min(25, 12.5 + sh*6)) * (t.trades.length?1:0);
   const sRisk   = Math.max(0, 20 - breachCount*2.5 - dd*25) * engaged;
-  const sMemo   = t.memo && t.memo.trim().length>200 ? 15 : (t.memo && t.memo.trim().length>50 ? 8 : 0);
+  // the memo plus anything logged round by round, so a diligent scribe is credited
+  const logChars = (t.roundLog||[]).reduce((a,l)=>a+(l.text||'').length, 0);
+  const written  = ((t.memo||'').trim().length) + logChars;
+  const sMemo    = written>200 ? 15 : written>50 ? 8 : 0;
   return { nav:a.nav, ret, sharpe:sh, maxDD:dd, breachCount, trades:t.trades.length,
            sPnl, sSharpe, sRisk, sMemo, total: sPnl+sSharpe+sRisk+sMemo };
 }
@@ -1323,7 +1328,7 @@ function handle(p, q, res){
         market:{ index:M.index, rate5y:M.rate5y, rate2y:M.rate2y, hy:M.creditHY, ig:M.creditIG, indexVol:M.indexVol },
         book,
         team:{ code:t.code, name:t.name, cash:t.cash, realized:t.realized,
-               memo:t.memo, navHistory:t.navHistory,
+               memo:t.memo, roundLog:(t.roundLog||[]).slice(-30), navHistory:t.navHistory,
                trades:t.trades.slice(-40).reverse() },
         analytics:{ nav:a.nav, gross:a.gross, net:a.net, vega:a.vega, gamma:a.gamma,
                     theta:a.theta, marginUsed:a.marginUsed, rows:a.rows, byUnder:a.byUnder },
@@ -1484,9 +1489,13 @@ function handle(p, q, res){
       if(task.kind==='log'){
         const line = String(q.note||'').trim().slice(0,240);
         if(line.length<10) return send(res,200,{ok:false,msg:'Write at least a short line.'});
-        t.memo = (t.memo ? t.memo+'\n' : '') + `R${S.round}: ${line}`;
+        /* Kept separate from t.memo on purpose. These used to append into the
+           same field the memo textarea overwrites, so every logged line was
+           silently destroyed the next time the memo autosaved. */
+        t.roundLog = t.roundLog || [];
+        t.roundLog.push({ round:S.round, text:line, by:seat.person, t:Date.now() });
         markTask(seat); save();
-        return send(res,200,{ok:true,msg:'Logged to the memo.'});
+        return send(res,200,{ok:true,msg:`Round ${S.round} decision logged.`});
       }
       markTask(seat); save();
       return send(res,200,{ok:true,msg:'Done.'});
