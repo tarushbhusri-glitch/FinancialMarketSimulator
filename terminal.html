@@ -299,10 +299,23 @@ canvas{width:100%;height:110px;display:block}
     <div id="tab-memo" style="display:none"><div class="pb">
       <p class="dim" style="font-size:11px;margin-bottom:9px" id="memohint">
         Worth 15 of 100 points. Explain your thesis, how you expressed it, how you managed risk,
-        and what you'd do differently. 200+ characters for full marks. Saves automatically.
-        Anyone on the desk can write here, but it is the Scribe's job.</p>
+        and what you'd do differently. Anyone on the desk can write here, but it is the Scribe's job.</p>
       <textarea id="memo" placeholder="Our core thesis this quarter was…"></textarea>
-      <p class="dim" id="memoc" style="font-size:10.5px;margin-top:6px"></p>
+      <div style="display:flex;gap:9px;align-items:center;margin-top:9px;flex-wrap:wrap">
+        <button id="memoSave" onclick="saveMemo()"
+          style="background:var(--acc);color:#04101f;padding:8px 20px;border-radius:5px;
+                 font-weight:700;letter-spacing:.05em;font-size:11.5px">SAVE MEMO</button>
+        <span id="memoState" class="dim" style="font-size:10.5px"></span>
+        <span class="grow"></span>
+        <span class="dim" id="memoc" style="font-size:10.5px"></span>
+      </div>
+      <div id="logwrap" style="margin-top:18px;display:none">
+        <div class="ph" style="margin:0 -13px;border-top:1px solid var(--line)">
+          ROUND LOG <span class="grow"></span>
+          <span class="dim" style="font-size:9px">saved separately, counts toward the memo score</span>
+        </div>
+        <div id="roundlog"></div>
+      </div>
     </div></div>
   </div>
  </div>
@@ -596,10 +609,7 @@ function render(){
   if(TAB==='queue') renderQueue();
   if(TAB==='pos')   renderPos();
   if(TAB==='bl')    renderBl();
-  if(TAB==='memo'){const el=document.getElementById('memo');
-    if(document.activeElement!==el&&!el.value)el.value=t.memo||'';
-    document.getElementById('memoc').textContent=el.value.trim().length+' characters, '+
-      (el.value.trim().length>200?'full marks (15/15)':el.value.trim().length>50?'partial (8/15)':'no marks yet (0/15)');}
+  if(TAB==='memo') renderMemo();
 
   renderRisk(); renderNews(); renderLb(); renderDesk();
   renderTask(); renderIntel(); renderScores(); chart(); riskChart();
@@ -1113,12 +1123,60 @@ async function idea(dir){
 setInterval(()=>{ if(ST && TAB==='chart') renderChartTab(); }, 1000);
 addEventListener('resize',()=>{ if(ST){ chart(); riskChart(); if(TAB==='chart') renderChartTab(); } });
 
-let mt;
-document.getElementById('memo').addEventListener('input',e=>{
+/* Memo editing. The textarea used to reload from the server only while empty and
+   autosave silently, which meant the scribe never knew whether anything had been
+   kept. Explicit save, visible state, and the round log lives in its own field
+   so the two can no longer overwrite each other. */
+let MEMO_DIRTY=false, mt;
+
+function renderMemo(){
+  const el=document.getElementById('memo'), t=ST.team;
+  if(!MEMO_DIRTY && document.activeElement!==el) el.value=t.memo||'';
+
+  const logs=t.roundLog||[];
+  const logChars=logs.reduce((a,l)=>a+(l.text||'').length,0);
+  const total=el.value.trim().length+logChars;
+  document.getElementById('memoc').textContent=
+    total+' characters written · '+
+    (total>200?'full marks (15/15)':total>50?'partial (8/15)':'no marks yet (0/15)');
+
+  const st=document.getElementById('memoState');
+  if(MEMO_DIRTY){ st.textContent='Unsaved changes'; st.className='warn'; }
+  else if(el.value.trim()){ st.textContent='Saved'; st.className='up'; }
+  else { st.textContent=''; st.className='dim'; }
+
+  document.getElementById('logwrap').style.display=logs.length?'':'none';
+  document.getElementById('roundlog').innerHTML=logs.map(l=>
+    `<div style="padding:8px 0;border-bottom:1px solid #141c27;font-size:11.5px;line-height:1.55">
+       <span class="acc" style="color:var(--acc);font-size:9.5px;letter-spacing:.1em">ROUND ${l.round}</span>
+       <span class="dim" style="font-size:9.5px;margin-left:8px">${l.by||''}</span>
+       <div style="margin-top:3px">${esc(l.text)}</div>
+     </div>`).join('');
+}
+
+async function saveMemo(){
+  const el=document.getElementById('memo');
+  const b=document.getElementById('memoSave');
+  b.disabled=true; b.textContent='SAVING…';
+  const r=await api('/api/memo',{code:CODE,token:TOKEN,memo:el.value});
+  b.disabled=false; b.textContent='SAVE MEMO';
+  if(r.ok){ MEMO_DIRTY=false; toast('Memo saved.'); poll(); }
+  else toast(r.msg||'Could not save.',1);
+}
+
+document.getElementById('memo').addEventListener('input',()=>{
+  MEMO_DIRTY=true;
+  const st=document.getElementById('memoState');
+  st.textContent='Unsaved changes'; st.className='warn';
   clearTimeout(mt);
-  document.getElementById('memoc').textContent=e.target.value.trim().length+' characters';
-  mt=setTimeout(()=>api('/api/memo',{code:CODE,token:TOKEN,memo:e.target.value}),700);
+  // still autosaves as a safety net, but the button is what people trust
+  mt=setTimeout(async()=>{
+    const r=await api('/api/memo',{code:CODE,token:TOKEN,memo:document.getElementById('memo').value});
+    if(r.ok){ MEMO_DIRTY=false; const s=document.getElementById('memoState');
+              s.textContent='Saved automatically'; s.className='up'; }
+  },1500);
 });
+addEventListener('beforeunload',e=>{ if(MEMO_DIRTY){ e.preventDefault(); e.returnValue=''; } });
 document.addEventListener('keydown',e=>{if(e.key==='Escape')closeTk();});
 
 // auto-resume: an existing token reclaims the same seat, so a refresh is seamless
