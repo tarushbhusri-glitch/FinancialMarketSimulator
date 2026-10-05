@@ -1,6 +1,8 @@
 <!DOCTYPE html>
 <html lang="en"><head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <title>Financial Trading System Simulator · Facilitator Console</title>
 <!--
 Copyright (c) 2026 Tarush Bhusri. All rights reserved.
@@ -13,11 +15,12 @@ pursued to the fullest extent of applicable law, including civil action and
 criminal prosecution where available.
 -->
 <style>
-:root{--bg:#0a0e14;--panel:#111721;--panel2:#161d2a;--line:#1f2937;--txt:#dbe4f0;
---dim:#7d8ba1;--acc:#4da3ff;--up:#2ecc8f;--dn:#ff5c72;--warn:#ffb020;
---mono:'SF Mono',ui-monospace,'Cascadia Mono',Menlo,Consolas,monospace}
+:root{--bg:#000000;--panel:#0c0e13;--panel2:#171a22;--line:rgba(255,255,255,.09);--txt:#edf0f6;
+--dim:#9099a8;--acc:#3a84ff;--up:#2ece80;--dn:#ff5e6e;--warn:#f0b24a;
+--ui:'Schibsted Grotesk',system-ui,-apple-system,sans-serif;
+--mono:'JetBrains Mono',ui-monospace,'Cascadia Mono',Menlo,Consolas,monospace}
 *{box-sizing:border-box;margin:0;padding:0}
-body{background:var(--bg);color:var(--txt);font:13px/1.45 var(--mono)}
+body{background:var(--bg);color:var(--txt);font:13.5px/1.5 var(--ui);font-variant-numeric:tabular-nums;font-feature-settings:"tnum" 1;-webkit-font-smoothing:antialiased}
 button{font:inherit;cursor:pointer;border:0;border-radius:5px}
 input,select{font:inherit;background:#0b111a;color:var(--txt);border:1px solid var(--line);
 border-radius:4px;padding:7px 9px;outline:none}
@@ -65,6 +68,38 @@ tbody tr:hover{background:#141b26}
 .logline{padding:4px 13px;font-size:11px;border-bottom:1px solid #151c27;color:var(--dim)}
 .logline b{color:var(--txt)}
 .mono-row{display:flex;justify-content:space-between;padding:4px 0;font-size:11.5px}
+
+/* ============================================================
+   LIQUID-GLASS SKIN (black) — CSS only. Class names and ids preserved.
+   ============================================================ */
+body::before{content:"";position:fixed;inset:0;z-index:-2;pointer-events:none;background:
+  radial-gradient(1100px 680px at 82% -10%, rgba(80,120,210,.10), transparent 58%),
+  radial-gradient(820px 560px at 4% 112%, rgba(255,255,255,.03), transparent 60%),
+  linear-gradient(180deg,#050608,#000 55%)}
+#gate{background:radial-gradient(1000px 720px at 72% -12%,rgba(80,120,210,.14),transparent 60%),#000}
+header{background:color-mix(in srgb,#0a0b0f 80%,transparent);
+  -webkit-backdrop-filter:blur(22px) saturate(160%);backdrop-filter:blur(22px) saturate(160%);
+  border-bottom:1px solid var(--line)}
+.card{background:color-mix(in srgb,var(--panel) 72%,transparent);
+  -webkit-backdrop-filter:blur(36px) saturate(190%);backdrop-filter:blur(36px) saturate(190%);
+  border:1px solid var(--line);border-radius:18px;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.1),0 40px 90px -40px rgba(0,0,0,.9)}
+.panel{background:color-mix(in srgb,var(--panel) 84%,transparent);
+  -webkit-backdrop-filter:blur(24px) saturate(165%);backdrop-filter:blur(24px) saturate(165%);
+  border:1px solid var(--line);border-radius:14px;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.06),0 22px 55px -30px rgba(0,0,0,.85)}
+.ph{background:transparent;border-bottom:1px solid var(--line);color:var(--dim)}
+input,select{background:rgba(255,255,255,.045);border:1px solid var(--line);border-radius:9px;color:var(--txt)}
+input:focus,select:focus{border-color:rgba(58,132,255,.6);box-shadow:0 0 0 3px rgba(58,132,255,.14)}
+.pill{background:rgba(255,255,255,.04);border:1px solid var(--line)}
+.b1{background:linear-gradient(180deg,#78aaff,#3a84ff);color:#061022}
+.b2{background:rgba(255,255,255,.05);color:var(--txt);border:1px solid var(--line)}
+.b3{background:rgba(255,94,110,.16);color:#ff8d98;border:1px solid rgba(255,94,110,.3)}
+.b4{background:rgba(150,120,255,.16);color:#c4b3ff;border:1px solid rgba(150,120,255,.3)}
+header button{border-radius:8px}
+table th{background:transparent}
+.nx{background:color-mix(in srgb,#10202f 68%,transparent);border-bottom:1px solid var(--line)}
+.bottag{border-radius:4px}
 </style></head><body>
 
 <div id="gate"><div class="card">
@@ -93,6 +128,7 @@ tbody tr:hover{background:#141b26}
   <button class="b2" id="pauseBtn" onclick="act('pause')">⏸ PAUSE TICKS</button>
   <button class="b4" id="demoBtn" onclick="demo()">🤖 DEMO FILL</button>
   <button class="b2" id="begBtn" onclick="act('beginner')">BEGINNER: OFF</button>
+  <button class="b2" onclick="showPasscodes()">🔑 PASSCODES</button>
   <button class="b2" onclick="exportCsv()">EXPORT CSV</button>
   <button class="b2" onclick="backup()">BACKUP</button>
   <button class="b2" onclick="document.getElementById('rf').click()">RESTORE</button>
@@ -138,7 +174,9 @@ tbody tr:hover{background:#141b26}
     </div>
   </div>
   <div class="panel">
-    <div class="ph">TEAM MONITOR <span class="grow"></span><span id="cnt" class="dim"></span></div>
+    <div class="ph">TEAM MONITOR <span class="grow"></span>
+      <span class="dim" style="font-size:9px">each team’s passcode is shown by its name</span>
+      <span id="cnt" class="dim"></span></div>
     <table id="tm"></table>
   </div>
   <div class="panel"><div class="ph">SCORECARD (live)</div><table id="sc"></table></div>
@@ -160,6 +198,37 @@ tbody tr:hover{background:#141b26}
     </div>
     <p id="nmDesc" class="dim" style="font-size:10.5px;line-height:1.5"></p>
   </div></div>
+  <div class="panel"><div class="ph">SCENARIO INTENSITY <span class="grow"></span>
+    <span id="chaosNow" class="up" style="font-size:9px"></span></div>
+    <div class="pb">
+      <div style="display:flex;gap:4px;margin-bottom:8px">
+        <button class="b2 ch" data-lo="0.75" data-hi="1.35" style="flex:1;padding:7px;font-size:10px" onclick="setChaos(0.75,1.35)">CALM</button>
+        <button class="b2 ch" data-lo="0.55" data-hi="1.8"  style="flex:1;padding:7px;font-size:10px" onclick="setChaos(0.55,1.8)">BALANCED</button>
+        <button class="b2 ch" data-lo="0.45" data-hi="2.2"  style="flex:1;padding:7px;font-size:10px" onclick="setChaos(0.45,2.2)">WILD</button>
+        <button class="b2 ch" data-lo="0.3"  data-hi="2.8"  style="flex:1;padding:7px;font-size:10px" onclick="setChaos(0.3,2.8)">EXTREME</button>
+      </div>
+      <div style="display:flex;gap:6px;align-items:center">
+        <span class="dim" style="font-size:10px">min</span>
+        <input id="chLo" type="number" step="0.05" min="0.1" max="1" style="width:60px">
+        <span class="dim" style="font-size:10px">max</span>
+        <input id="chHi" type="number" step="0.05" min="1" max="4" style="width:60px">
+        <button class="b2" style="padding:7px 10px;font-size:11px" onclick="setChaosCustom()">APPLY</button>
+      </div>
+      <p class="dim" style="font-size:10px;margin-top:8px;line-height:1.5">Direction always matches the scenario. This sets how much the SIZE of each event varies: wider = more unpredictable. Applies from the next round.</p>
+    </div>
+  </div>
+  <div class="panel"><div class="ph">MARKET IMPACT · DEMAND/SUPPLY <span class="grow"></span>
+    <span id="impNow" class="dim" style="font-size:9px"></span></div>
+    <div class="pb">
+      <button id="impToggle" class="b2" style="width:100%;padding:9px;font-weight:700;letter-spacing:.05em" onclick="toggleImpact()">MARKET IMPACT: OFF</button>
+      <div style="display:flex;gap:4px;margin-top:8px">
+        <button class="b2 ik" data-k="0.5" style="flex:1;padding:7px;font-size:10px" onclick="setImpactK(0.5)">GENTLE</button>
+        <button class="b2 ik" data-k="1"   style="flex:1;padding:7px;font-size:10px" onclick="setImpactK(1)">NORMAL</button>
+        <button class="b2 ik" data-k="2"   style="flex:1;padding:7px;font-size:10px" onclick="setImpactK(2)">STRONG</button>
+      </div>
+      <p class="dim" style="font-size:10px;margin-top:8px;line-height:1.5">When on, team buying lifts a price and selling lowers it, across all teams. Bots never count. The effect is capped below the news move (so it never flips the scenario or scoring) and fades when trading stops.</p>
+    </div>
+  </div>
   <div class="panel"><div class="ph">TIMING</div><div class="pb">
     <div class="mono-row"><span class="dim">Mode</span><b id="tmode">auto</b></div>
     <div class="mono-row"><span class="dim">Next round window</span><b id="tnext">—</b></div>
@@ -177,8 +246,22 @@ tbody tr:hover{background:#141b26}
  </div>
 </div>
 
+<div id="pcModal" style="position:fixed;inset:0;background:#000b;display:none;place-items:center;z-index:120;
+  -webkit-backdrop-filter:blur(4px);backdrop-filter:blur(4px)">
+ <div class="card" style="width:min(580px,92vw);max-height:86vh;overflow:auto">
+  <h1 style="font-size:17px;letter-spacing:.1em;margin-bottom:4px">TEAM PASSCODES</h1>
+  <p class="dim" style="font-size:11.5px;margin-bottom:15px">Give each team only its own passcode. Codes change on RESET — distribute after your final reset.</p>
+  <div id="pcList" style="display:grid;grid-template-columns:1fr 1fr;gap:8px"></div>
+  <div style="display:flex;gap:9px;margin-top:17px">
+   <button class="b1" style="flex:1;padding:11px;font-weight:700" onclick="copyPasscodes()">COPY ALL</button>
+   <button class="b2" style="flex:1;padding:11px" onclick="document.getElementById('pcModal').style.display='none'">CLOSE</button>
+  </div>
+  <p id="pcCopied" class="up" style="font-size:11px;margin-top:11px;display:none"></p>
+ </div>
+</div>
 <script>
 let P='',D=null;
+const esc=s=>String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
 const fmt=(n,d=2)=>n==null||!isFinite(n)?'—':n.toLocaleString('en-US',{minimumFractionDigits:d,maximumFractionDigits:d});
 const usd=n=>(n<0?'-':'')+'$'+Math.abs(n).toLocaleString('en-US',{maximumFractionDigits:0});
 const cls=n=>n>0?'up':n<0?'dn':'dim';
@@ -202,7 +285,32 @@ async function tick(){const d=await call('');if(d.ok){D=d;draw();}}
 async function act(a,x){const d=await call(a,x);if(d.ok){D=d;draw();}}
 async function setLen(){const m=Number(document.getElementById('rl').value)||5;
   const d=await call('length',{secs:m*60});if(d.ok){D=d;draw();}}
-function exportCsv(){window.open('/api/export?pass='+encodeURIComponent(P),'_blank');}
+async function exportCsv(){
+  const r=await fetch('/api/export',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({pass:P})});
+  const txt=await r.text();
+  if(!txt.startsWith('Rank,')){ alert(txt||'Export denied.'); return; }
+  const url=URL.createObjectURL(new Blob([txt],{type:'text/csv'}));
+  const a=document.createElement('a');
+  a.href=url; a.download=`fts-scores-r${D?D.round:0}.csv`; a.click(); URL.revokeObjectURL(url);
+}
+function showPasscodes(){
+  const T=(D&&D.teams)||[];
+  document.getElementById('pcList').innerHTML = T.length ? T.map(t=>
+    `<div style="display:flex;justify-content:space-between;align-items:center;padding:10px 13px;border-radius:9px;
+       background:rgba(255,255,255,.04);border:1px solid var(--line)">
+       <span>${esc(t.code)}</span><b style="color:var(--acc);letter-spacing:.1em;font-size:14px">${esc(t.secret||'—')}</b></div>`).join('')
+    : '<p class="dim">Unlock and wait for the first refresh, then reopen.</p>';
+  const c=document.getElementById('pcCopied'); c.style.display='none';
+  document.getElementById('pcModal').style.display='grid';
+}
+function copyPasscodes(){
+  const T=(D&&D.teams)||[];
+  const txt=T.map(t=>t.code+' — '+(t.secret||'—')).join('\n');
+  const done=()=>{const p=document.getElementById('pcCopied');p.textContent='Copied to clipboard.';p.style.display='block';};
+  const fail=()=>{const p=document.getElementById('pcCopied');p.textContent='Copy unavailable here — select the list text manually.';p.style.display='block';};
+  if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(txt).then(done).catch(fail);}else{fail();}
+}
 
 async function backup(){
   const r=await fetch('/api/backup',{method:'POST',headers:{'Content-Type':'application/json'},
@@ -226,6 +334,14 @@ async function restore(input){
 }
 function setCampaign(){ act('campaign',{campaign:document.getElementById('camp').value}); }
 function newsMode(m){ act('newsmode',{mode:m}); }
+function setChaos(lo,hi){ act('chaos',{lo,hi}); }
+function setChaosCustom(){
+  const lo=Number(document.getElementById('chLo').value), hi=Number(document.getElementById('chHi').value);
+  if(!(lo<hi)){ alert('Min must be less than max.'); return; }
+  act('chaos',{lo,hi});
+}
+function toggleImpact(){ act('impact',{on: D && D.impactOn ? 0 : 1}); }
+function setImpactK(k){ act('impact',{k}); }
 const act2 = act;   // kept for callers that used the two-argument name
 async function pushNews(){
   const text=document.getElementById('pushText').value.trim();
@@ -336,26 +452,48 @@ function draw(){
     full:'Every team gets a different draw, so desk 3 may know something desk 7 does not. Most realistic, hardest to debrief fairly.'
   }[D.newsMode||'role'];
 
+  // scenario intensity (chaos band)
+  if(D.chaosLo!=null){
+    document.getElementById('chaosNow').textContent='size ×'+D.chaosLo+' – ×'+D.chaosHi;
+    const alo=document.getElementById('chLo'), ahi=document.getElementById('chHi');
+    if(document.activeElement!==alo) alo.value=D.chaosLo;
+    if(document.activeElement!==ahi) ahi.value=D.chaosHi;
+    [...document.querySelectorAll('.ch')].forEach(b=>
+      b.className='b'+(Number(b.dataset.lo)===D.chaosLo&&Number(b.dataset.hi)===D.chaosHi?'1':'2')+' ch');
+  }
+
+  // market impact (demand/supply)
+  if(D.impactOn!=null){
+    const tb=document.getElementById('impToggle');
+    tb.textContent='MARKET IMPACT: '+(D.impactOn?'ON':'OFF');
+    tb.className=D.impactOn?'b1':'b2';
+    document.getElementById('impNow').textContent=D.impactOn?('on · '+(D.impactK||1)+'x'):'off';
+    document.getElementById('impNow').className=D.impactOn?'up':'dim';
+    document.getElementById('impNow').style.fontSize='9px';
+    [...document.querySelectorAll('.ik')].forEach(b=>
+      b.className='b'+(D.impactOn&&Number(b.dataset.k)===D.impactK?'1':'2')+' ik');
+  }
+
   // push targets
   const pt=document.getElementById('pushTo');
   if(pt.options.length!==T.length+1){
     pt.innerHTML='<option value="ALL">Every team</option>'+
-      T.filter(t=>!t.bot).map(t=>`<option value="${t.code}">${t.name||t.code}</option>`).join('');
+      T.filter(t=>!t.bot).map(t=>`<option value="${esc(t.code)}">${esc(t.name||t.code)}</option>`).join('');
   }
 
   const P=(D.people||[]).slice(0,12);
   document.getElementById('ppl').innerHTML=P.length
     ? `<thead><tr><th>#</th><th>PERSON</th><th>TEAM</th><th>ROLE</th><th>CALLS</th><th>IDEAS USED</th><th>PTS</th></tr></thead><tbody>`+
       P.map((p,i)=>`<tr><td class="dim">${i+1}</td>
-        <td>${p.doneThisRound?'<span class="up">●</span> ':'<span class="dim">○</span> '}${p.person}</td>
-        <td class="dim">${p.fund||p.team}</td><td class="dim">${p.roles}</td>
+        <td>${p.doneThisRound?'<span class="up">●</span> ':'<span class="dim">○</span> '}${esc(p.person)}</td>
+        <td class="dim">${esc(p.fund||p.team)}</td><td class="dim">${esc(p.roles)}</td>
         <td><span class="up">${p.right}</span>/<span class="dn">${p.wrong}</span></td>
         <td class="dim">${p.filled||'—'}</td><td><b>${p.points}</b></td></tr>`).join('')+`</tbody>`
     : '<tbody><tr><td class="dim" style="padding:18px;text-align:center">Nobody seated yet.</td></tr></tbody>';
   document.getElementById('tm').innerHTML=
     `<thead><tr><th>TEAM</th><th>SEATS</th><th>QUEUE</th><th>NAV</th><th>RET</th><th>GROSS</th><th>NET</th><th>VEGA</th><th>BRCH</th><th>TRDS</th><th>MEMO</th><th></th></tr></thead><tbody>`+
     T.map(t=>`<tr class="${t.bot?'botrow':''}">
-      <td><span class="dot ${t.online?'on':''}"></span>${t.joined?(t.name||t.code):'<span class="dim">'+t.code+' (empty)</span>'}${t.bot?`<span class="bottag" title="${t.strategy}">DEMO</span>`:''}</td>
+      <td><span class="dot ${t.online?'on':''}"></span>${t.joined?esc(t.name||t.code):'<span class="dim">'+esc(t.code)+' (empty)</span>'}${t.bot?`<span class="bottag" title="${esc(t.strategy)}">DEMO</span>`:(t.secret?` <span class="bottag" style="color:var(--acc);background:#13243a" title="Passcode for ${esc(t.code)} — give to this team only">${esc(t.code)} · ${esc(t.secret)}</span>`:'')}</td>
       <td class="${t.bot?'dim':t.rolesHeld===t.seatsMax?'up':t.seated?'':'dim'}" title="${t.seated||0} people covering ${t.rolesHeld||0} seats">${t.bot?'bot':(t.seated||0)+'p / '+(t.rolesHeld||0)+'s'}${t.noPM?' <span class="warn">no PM</span>':''}</td>
       <td class="${t.pending>6?'dn':t.pending?'warn':'dim'}">${t.pending||'—'}</td>
       <td class="${cls(t.ret)}">${t.joined?usd(t.nav):'—'}</td>
@@ -367,12 +505,12 @@ function draw(){
       <td class="dim">${t.trades||'—'}</td>
       <td class="${t.memo?'up':'dim'}">${t.memo?'✓':'—'}</td>
       <td>${t.bot ? '<span class="dim">bot</span>' : t.claimed
-        ?`<button class="b2" style="padding:2px 8px;font-size:10.5px" onclick='release(${JSON.stringify(t.code)},${JSON.stringify(t.name||'')})'>RELEASE</button>`
+        ?`<button class="b2" style="padding:2px 8px;font-size:10.5px" onclick='release(${esc(JSON.stringify(t.code))},${esc(JSON.stringify(t.name||''))})'>RELEASE</button>`
         :'<span class="dim">free</span>'}</td></tr>`).join('')+`</tbody>`;
 
   document.getElementById('sc').innerHTML=
     `<thead><tr><th>#</th><th>TEAM</th><th>RET</th><th>SHARPE</th><th>MAX DD</th><th>P&L/40</th><th>SHP/25</th><th>RSK/20</th><th>MEM/15</th><th>TOTAL</th></tr></thead><tbody>`+
-    D.scores.map((s,i)=>`<tr><td class="dim">${i+1}</td><td>${s.name||s.code}</td>
+    D.scores.map((s,i)=>`<tr><td class="dim">${i+1}</td><td>${esc(s.name||s.code)}</td>
       <td class="${cls(s.ret)}">${sgn(s.ret*100)}%</td><td>${fmt(s.sharpe,2)}</td>
       <td class="dn">${fmt(s.maxDD*100,1)}%</td>
       <td class="dim">${fmt(s.sPnl,1)}</td><td class="dim">${fmt(s.sSharpe,1)}</td>
@@ -385,7 +523,7 @@ function draw(){
     : '<div class="pb dim">No news released yet.</div>';
 
   document.getElementById('log').innerHTML=D.log.map(l=>
-    `<div class="logline"><b>${l.name||l.team}</b> ${l.msg}</div>`).join('')
+    `<div class="logline"><b>${esc(l.name||l.team)}</b> ${esc(l.msg)}</div>`).join('')
     ||'<div class="pb dim">No trades yet.</div>';
 }
 
