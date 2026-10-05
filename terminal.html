@@ -1,6 +1,8 @@
 <!DOCTYPE html>
 <html lang="en"><head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <title>Financial Trading System Simulator · Trading Terminal</title>
 <!--
 Copyright (c) 2026 Tarush Bhusri. All rights reserved.
@@ -14,19 +16,20 @@ criminal prosecution where available.
 -->
 <style>
 :root{
-  --bg:#070a0f; --panel:#0e141d; --panel2:#141b26; --line:#1c2634; --line2:#243040;
-  --txt:#e2e9f3; --dim:#78879e; --acc:#4da3ff; --up:#00d68f; --dn:#ff4d6a;
-  --warn:#ffb020; --gold:#e8b64c;
-  --mono:'SF Mono',ui-monospace,'Cascadia Mono','JetBrains Mono',Menlo,Consolas,monospace;
+  --bg:#000000; --panel:#0c0e13; --panel2:#171a22; --line:rgba(255,255,255,.09); --line2:rgba(255,255,255,.16);
+  --txt:#edf0f6; --dim:#9099a8; --acc:#3a84ff; --up:#2ece80; --dn:#ff5e6e;
+  --warn:#f0b24a; --gold:#e8b64c;
+  --ui:'Schibsted Grotesk',system-ui,-apple-system,sans-serif;
+  --mono:'JetBrains Mono',ui-monospace,'Cascadia Mono',Menlo,Consolas,monospace;
 }
-@keyframes flashUp{0%{background:rgba(0,214,143,.28)}100%{background:transparent}}
-@keyframes flashDn{0%{background:rgba(255,77,106,.28)}100%{background:transparent}}
+@keyframes flashUp{0%{background:rgba(46,206,128,.26)}100%{background:transparent}}
+@keyframes flashDn{0%{background:rgba(255,94,110,.26)}100%{background:transparent}}
 .fu{animation:flashUp .7s ease-out} .fd{animation:flashDn .7s ease-out}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
 .livedot{width:6px;height:6px;border-radius:50%;background:var(--up);
   display:inline-block;margin-right:5px;animation:pulse 1.6s infinite}
 *{box-sizing:border-box;margin:0;padding:0}
-body{background:var(--bg);color:var(--txt);font:13px/1.45 var(--mono);-webkit-font-smoothing:antialiased}
+body{background:var(--bg);color:var(--txt);font:13.5px/1.5 var(--ui);-webkit-font-smoothing:antialiased;font-variant-numeric:tabular-nums;font-feature-settings:"tnum" 1}
 button{font:inherit;cursor:pointer;border:0}
 input,select,textarea{font:inherit;background:#0b111a;color:var(--txt);border:1px solid var(--line);
   border-radius:4px;padding:7px 9px;outline:none}
@@ -213,6 +216,51 @@ canvas{width:100%;height:110px;display:block}
 .co p{font-size:11.5px;line-height:1.6;color:var(--txt)}
 .co .dr{font-size:10.5px;line-height:1.55;color:var(--dim);margin-top:7px;
         border-left:2px solid #22303f;padding-left:9px}
+
+/* ============================================================
+   LIQUID-GLASS SKIN (black) — CSS only. Every original class name and
+   element id is preserved; this block restyles surfaces, nothing else.
+   ============================================================ */
+body::before{content:"";position:fixed;inset:0;z-index:-2;pointer-events:none;background:
+  radial-gradient(1100px 680px at 82% -10%, rgba(80,120,210,.10), transparent 58%),
+  radial-gradient(820px 560px at 4% 112%, rgba(255,255,255,.03), transparent 60%),
+  linear-gradient(180deg,#050608,#000 55%)}
+header{background:color-mix(in srgb,#0a0b0f 80%,transparent);
+  -webkit-backdrop-filter:blur(22px) saturate(160%);backdrop-filter:blur(22px) saturate(160%);
+  border-bottom:1px solid var(--line)}
+.pill{background:rgba(255,255,255,.04);border:1px solid var(--line);border-radius:9px}
+.badge{background:rgba(58,132,255,.14);color:#8fc0ff}
+.panel{background:color-mix(in srgb,var(--panel) 84%,transparent);
+  -webkit-backdrop-filter:blur(24px) saturate(165%);backdrop-filter:blur(24px) saturate(165%);
+  border:1px solid var(--line);border-radius:14px;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.06),0 22px 55px -30px rgba(0,0,0,.85)}
+.ph{background:transparent;border-bottom:1px solid var(--line);color:var(--dim);font-weight:600}
+input,select,textarea{background:rgba(255,255,255,.045);border:1px solid var(--line);border-radius:9px;color:var(--txt)}
+input:focus,select:focus,textarea:focus{border-color:rgba(58,132,255,.6);box-shadow:0 0 0 3px rgba(58,132,255,.14)}
+.stat{background:color-mix(in srgb,var(--panel2) 55%,transparent)}
+th{background:color-mix(in srgb,var(--panel) 92%,transparent)}
+tbody tr:nth-child(even){background:rgba(255,255,255,.015)}
+tbody tr:hover,tbody tr:nth-child(even):hover{background:rgba(255,255,255,.05)}
+.tabs{background:transparent;border-bottom:1px solid var(--line)}
+.tradebtn{background:rgba(58,132,255,.12);color:#7fb2ff;border:1px solid rgba(58,132,255,.28);border-radius:8px}
+.tradebtn:hover{background:var(--acc);color:#061022}
+.buy{background:linear-gradient(180deg,#3ee29a,#13c074);color:#03150e}
+.sell{background:linear-gradient(180deg,#ff8591,#ff4d60);color:#2a0409}
+.ghost{background:rgba(255,255,255,.05);color:var(--dim);border:1px solid var(--line)!important}
+#login{background:radial-gradient(1000px 720px at 72% -12%,rgba(80,120,210,.14),transparent 60%),#000}
+.card{background:color-mix(in srgb,var(--panel) 72%,transparent);
+  -webkit-backdrop-filter:blur(36px) saturate(190%);backdrop-filter:blur(36px) saturate(190%);
+  border:1px solid var(--line);border-radius:18px;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.1),0 40px 90px -40px rgba(0,0,0,.9)}
+.card button,.card input{border-radius:10px}
+#toast,#tip{background:color-mix(in srgb,var(--panel) 92%,transparent);
+  -webkit-backdrop-filter:blur(20px) saturate(170%);backdrop-filter:blur(20px) saturate(170%);
+  border:1px solid var(--line2);border-radius:11px}
+#task{background:color-mix(in srgb,#12202f 72%,transparent);border:1px solid rgba(58,132,255,.25);border-radius:14px}
+#task.done{background:color-mix(in srgb,#0f1d17 72%,transparent);border-color:rgba(46,206,128,.3)}
+#task button{border-radius:9px}
+.hcell,.gauge{border-radius:10px}
+#ticket .card{border-radius:16px}
 </style></head><body>
 
 <div id="login"><div class="card" style="width:520px">
@@ -220,6 +268,9 @@ canvas{width:100%;height:110px;display:block}
   <label>TEAM CODE</label>
   <input id="lc" placeholder="TEAM01" autocomplete="off" oninput="loadRoles()">
   <label>YOUR NAME</label><input id="lp" placeholder="e.g. Priya" autocomplete="off">
+  <label>TEAM PASSCODE <span class="dim" style="text-transform:none">(your facilitator gives you this)</span></label>
+  <input id="lsec" placeholder="e.g. K7QD" autocomplete="off" maxlength="12"
+         onkeydown="if(event.key==='Enter')join()">
   <label id="lnlab">FUND NAME <span class="dim" style="text-transform:none">(first person on the team sets this)</span></label>
   <input id="ln" placeholder="e.g. Ridgeline Partners" autocomplete="off">
   <label>YOUR SEAT(S) <span class="dim" style="text-transform:none">— pick more than one if your team is short-handed</span></label>
@@ -246,6 +297,10 @@ canvas{width:100%;height:110px;display:block}
   <span class="pill"><span>5Y</span> <b id="hR5">—</b></span>
   <span class="pill"><span>HY</span> <b id="hHY">—</b></span>
   <span class="pill"><span>NAV</span> <b id="hNav">—</b></span>
+  <button id="signout" onclick="signOut()" title="Sign out — your seat and book are kept"
+    style="margin-left:10px;background:#241922;color:var(--dn);border:1px solid #4a1c26;
+           border-radius:4px;padding:5px 11px;font-size:10.5px;letter-spacing:.06em;
+           font-weight:600;cursor:pointer">SIGN OUT</button>
 </header>
 
 <div class="wrap">
@@ -382,7 +437,7 @@ canvas{width:100%;height:110px;display:block}
 </footer>
 
 <script>
-let CODE='', TOKEN='', ROLE='', ST=null, TK=null, TAB='mkt', POLL=null, PICK='';
+let CODE='', TOKEN='', ROLE='', ST=null, TK=null, TAB='mkt', POLL=null, PICK='', GAMEID='';
 
 /* Plain-English explanations. The finance term stays on screen; this appears
    on hover, so people pick up the vocabulary instead of being blocked by it. */
@@ -416,7 +471,7 @@ const G={
  'BREACH':'You went past one of your risk limits. It does not block the trade but it costs points.',
  'MARGIN':'The deposit you post to hold a derivative. It is a fraction of the full size, which is where leverage comes from.'
 };
-const esc=s=>String(s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;');
+const esc=s=>String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
 const g=(t,k)=>{
   const key=(k||String(t)).toUpperCase().replace(/<[^>]*>/g,'');
   const txt=G[key];
@@ -506,24 +561,47 @@ async function join(){
   const c=document.getElementById('lc').value.trim().toUpperCase();
   const n=document.getElementById('ln').value.trim();
   const p=document.getElementById('lp').value.trim();
+  const sec=(document.getElementById('lsec').value||'').trim();
   if(!c){err('Enter your team code.');return;}
   if(!p){err('Enter your name.');return;}
-  if(!PICKS.length){err('Pick at least one seat on the desk.');return;}
   const saved=localStorage.getItem('mcc_token_'+c)||'';
-  const r=await api('/api/join',{code:c,name:n,person:p,roles:PICKS,token:saved});
-  if(!r.ok){err(r.msg);loadRoles();return;}
+  // A saved token resumes your existing seat; only a brand-new seat needs seats picked.
+  if(!saved && !PICKS.length){err('Pick at least one seat on the desk.');return;}
+  const r=await api('/api/join',{code:c,name:n,person:p,roles:PICKS,token:saved,secret:sec});
+  if(!r.ok){
+    if(saved){ localStorage.removeItem('mcc_token_'+c); }  // stale token (game ended/reset): allow a fresh join
+    err(r.msg);loadRoles();return;
+  }
   CODE=c; TOKEN=r.token; ROLE=(r.roles||[])[0];
+  if(r.gameId) GAMEID=r.gameId;
   localStorage.setItem('mcc_code',c);
   localStorage.setItem('mcc_person',p);
   localStorage.setItem('mcc_token_'+c,r.token);
+  localStorage.removeItem('mcc_signedout');
   document.getElementById('login').style.display='none';
   poll(); if(POLL) clearInterval(POLL); POLL=setInterval(poll, r.poll||2500);
 }
-function err(m){const e=document.getElementById('lerr');e.textContent=m;e.style.display='block';}
+function err(m){const e=document.getElementById('lerr');e.style.color='var(--dn)';e.textContent=m;e.style.display='block';}
 function kick(m){
   if(POLL) clearInterval(POLL);
   document.getElementById('login').style.display='grid';
   err(m||'Session ended. Log in again.');
+}
+/* Sign out now, but keep the token so logging back in resumes the same seat and
+   book while the game is still running. If the facilitator has ended or reset the
+   game, the server declines the resume and a fresh game loads instead. */
+function signOut(){
+  if(POLL){ clearInterval(POLL); POLL=null; }
+  const c = CODE || localStorage.getItem('mcc_code') || '';
+  CODE=''; TOKEN=''; ST=null;
+  try{ localStorage.setItem('mcc_signedout','1'); }catch(e){}
+  document.getElementById('login').style.display='grid';
+  document.getElementById('lc').value=c;
+  document.getElementById('lp').value=localStorage.getItem('mcc_person')||'';
+  const le=document.getElementById('lerr');
+  le.style.color='var(--dim)'; le.style.display='block';
+  le.textContent='Signed out. Log back in to pick up exactly where you left off.';
+  loadRoles();
 }
 
 document.getElementById('tabs').onclick=e=>{
@@ -539,6 +617,14 @@ async function poll(){
   const d=await api('/api/state',{code:CODE, token:TOKEN, bv:BV, cs:CS});
   if(d.ok){
     conn(true);
+    // the facilitator reset the game -> a different game is now running
+    if(d.gameId){
+      if(GAMEID && d.gameId!==GAMEID){
+        try{ localStorage.removeItem('mcc_token_'+CODE); }catch(e){}
+        kick('A new game has started. Log in again.'); return;
+      }
+      GAMEID=d.gameId;
+    }
     // the server omits the book while our cached copy is current
     if(d.book){ BOOK=d.book; BV=d.bookVersion; }
     d.book=BOOK;
@@ -664,8 +750,8 @@ function renderIntel(){
   const list=ST.me.intel||[];
   document.getElementById('intelpanel').style.display=list.length?'':'none';
   document.getElementById('intel').innerHTML=list.map(i=>
-    `<div class="intel"><div class="c">ON ${String(i.cover).toUpperCase()} · ROUND ${i.round}</div>
-     <p>${i.text}</p>
+    `<div class="intel"><div class="c">ON ${esc(String(i.cover).toUpperCase())} · ROUND ${i.round}</div>
+     <p>${esc(i.text)}</p>
      <div class="w">Not every note turns out to be right. Judge it, then decide whether to tell the desk.</div>
     </div>`).join('');
 }
@@ -674,7 +760,7 @@ function renderScores(){
   const d=ST.deskScores||[];
   document.getElementById('mescores').innerHTML=d.map(s=>
     `<div class="me-score ${s.person===ST.me.person?'you':''}">
-      <span>${s.done?'<span class="tick">●</span>':'<span class="cross">○</span>'} ${s.person}</span>
+      <span>${s.done?'<span class="tick">●</span>':'<span class="cross">○</span>'} ${esc(s.person)}</span>
       <span>${s.right?'<span class="up">'+s.right+'✓</span> ':''}${s.wrong?'<span class="dn">'+s.wrong+'✗</span> ':''}<b>${s.points}</b></span>
     </div>`).join('')
     +`<div class="me-score dim"><span>● = task done this round</span><span></span></div>`;
@@ -683,7 +769,7 @@ function renderScores(){
 function renderDesk(){
   const d=ST.desk, held=d.reduce((n,s)=>n+s.roles.length,0);
   document.getElementById('desk').innerHTML=d.map(s=>
-    `<div class="deskrow"><span>${s.person===ST.me.person?'<b>'+s.person+'</b>':s.person}</span>
+    `<div class="deskrow"><span>${s.person===ST.me.person?'<b>'+esc(s.person)+'</b>':esc(s.person)}</span>
      <span class="dim" style="text-align:right">${s.roleLabel}${s.online?'':' <span class="dn">offline</span>'}</span></div>`).join('')
     +`<div class="deskrow dim"><span>${d.length} ${d.length===1?'person':'people'}, ${held} of 14 seats covered</span><span></span></div>`;
 
@@ -738,10 +824,10 @@ function renderQueue(){
           ${Math.abs(i.qty)} ${i.label}${i.large?' <span class="warn">LARGE</span>':''}</span>
         <span class="st ${i.held?'held':i.status}">${i.held?'HELD':i.status.toUpperCase()}</span>
       </div>
-      <div class="th">“${i.thesis}” <span class="dim">— ${i.from}</span>
-        ${i.note?`<br><span class="dim">Research: ${i.note}</span>`:''}
-        ${i.held?`<br><span class="warn">Risk hold: ${i.holdNote} (${i.holdSecsLeft}s)</span>`:''}
-        ${i.status==='filled'?`<br><span class="up">Filled at ${fmt(i.fillPx)} by ${i.filledBy}</span>`:''}
+      <div class="th">“${esc(i.thesis)}” <span class="dim">— ${esc(i.from)}</span>
+        ${i.note?`<br><span class="dim">Research: ${esc(i.note)}</span>`:''}
+        ${i.held?`<br><span class="warn">Risk hold: ${esc(i.holdNote)} (${i.holdSecsLeft}s)</span>`:''}
+        ${i.status==='filled'?`<br><span class="up">Filled at ${fmt(i.fillPx)} by ${esc(i.filledBy)}</span>`:''}
       </div>
       ${acts.length?`<div class="acts">${acts.join('')}</div>`:''}
     </div>`;
@@ -832,12 +918,12 @@ function renderRisk(){
 
 function renderNews(){
   document.getElementById('news').innerHTML=ST.news.length?ST.news.map(n=>
-    `<div class="news"><div class="r">ROUND ${n.round}</div><h4>${n.headline}</h4><p>${n.body}</p></div>`).join('')
+    `<div class="news"><div class="r">ROUND ${n.round}</div><h4>${esc(n.headline)}</h4><p>${esc(n.body)}</p></div>`).join('')
     :'<div class="news"><p class="dim">Awaiting market open…</p></div>';
 }
 function renderLb(){
   document.getElementById('lb').innerHTML=ST.leaderboard.map((x,i)=>
-    `<div class="lb ${x.code===ST.team.code?'me':''}"><span>${i+1}. ${x.name||x.code}</span>
+    `<div class="lb ${x.code===ST.team.code?'me':''}"><span>${i+1}. ${esc(x.name||x.code)}</span>
      <span class="${cls(x.ret)}">${sgn(x.ret*100)}%</span></div>`).join('');
 }
 
@@ -849,7 +935,7 @@ function ctx2d(id,h){
   const x=c.getContext('2d'); x.setTransform(dpr,0,0,dpr,0,0);
   x.clearRect(0,0,w,h); return {x,w,h};
 }
-const CUP='#00d68f', CDN='#ff4d6a';
+const CUP='#2ece80', CDN='#ff5e6e';
 
 /* 1. Fund NAV with drawdown shading */
 function chart(){
@@ -867,7 +953,7 @@ function chart(){
   for(let i=arr.length-1;i>=0;i--) x.lineTo(X(i),Y(arr[i]));
   x.closePath(); x.fillStyle='rgba(255,77,106,.14)'; x.fill();
 
-  x.strokeStyle='#243040'; x.setLineDash([3,4]); x.beginPath();
+  x.strokeStyle='rgba(255,255,255,.08)'; x.setLineDash([3,4]); x.beginPath();
   x.moveTo(0,Y(1e8)); x.lineTo(w,Y(1e8)); x.stroke(); x.setLineDash([]);
 
   const up=nav>=1e8;
@@ -941,7 +1027,7 @@ function drawUniverse(){
 function drawCandles(bars){
   const g=ctx2d('cCandle',340); if(!g) return;
   const {x,w,h}=g;
-  if(bars.length<2){ x.fillStyle='#78879e'; x.font='12px monospace';
+  if(bars.length<2){ x.fillStyle='#9099a8'; x.font='12px monospace';
     x.fillText('Waiting for the market to open…',14,28); return; }
   const show=bars.slice(-90);
   const hi=Math.max(...show.map(b=>b.h)), lo=Math.min(...show.map(b=>b.l));
@@ -954,8 +1040,8 @@ function drawCandles(bars){
   x.font='9.5px monospace'; x.textAlign='right';
   for(let i=0;i<=4;i++){
     const v=bot+(top-bot)*i/4, y=Y(v);
-    x.strokeStyle='#141c27'; x.beginPath(); x.moveTo(L,y); x.lineTo(w-R,y); x.stroke();
-    x.fillStyle='#4a5a70'; x.fillText(fmt(v,1),L-6,y+3);
+    x.strokeStyle='rgba(255,255,255,.05)'; x.beginPath(); x.moveTo(L,y); x.lineTo(w-R,y); x.stroke();
+    x.fillStyle='#616878'; x.fillText(fmt(v,1),L-6,y+3);
   }
   x.textAlign='left';
 
@@ -964,9 +1050,9 @@ function drawCandles(bars){
   show.forEach((b,i)=>{
     if(b.r!==lastR){
       const px=L+i*cw;
-      x.strokeStyle='#2b3a4e'; x.setLineDash([2,3]); x.beginPath();
+      x.strokeStyle='rgba(255,255,255,.12)'; x.setLineDash([2,3]); x.beginPath();
       x.moveTo(px,T); x.lineTo(px,h-B); x.stroke(); x.setLineDash([]);
-      x.fillStyle='#5d6f88'; x.font='9px monospace'; x.fillText('R'+b.r,px+3,T+9);
+      x.fillStyle='#616878'; x.font='9px monospace'; x.fillText('R'+b.r,px+3,T+9);
       lastR=b.r;
     }
   });
@@ -1034,8 +1120,8 @@ function riskChart(){
   }
   const mx=Math.max(...pts.map(p=>Math.abs(p.pnl)),1);
   const X=i=>8+i/(pts.length-1)*(w-16), Y=v=>h/2-(v/mx)*(h/2-10);
-  x.strokeStyle='#243040'; x.beginPath(); x.moveTo(0,h/2); x.lineTo(w,h/2); x.stroke();
-  x.strokeStyle='#243040'; x.setLineDash([2,3]);
+  x.strokeStyle='rgba(255,255,255,.08)'; x.beginPath(); x.moveTo(0,h/2); x.lineTo(w,h/2); x.stroke();
+  x.strokeStyle='rgba(255,255,255,.08)'; x.setLineDash([2,3]);
   x.beginPath(); x.moveTo(X((pts.length-1)/2),6); x.lineTo(X((pts.length-1)/2),h-6); x.stroke();
   x.setLineDash([]);
   pts.forEach((p,i)=>{
@@ -1044,7 +1130,7 @@ function riskChart(){
     x.strokeStyle=(p.pnl>=0?CUP:CDN); x.lineWidth=2;
     x.beginPath(); x.moveTo(X(i-1),Y(a.pnl)); x.lineTo(X(i),Y(p.pnl)); x.stroke();
   });
-  x.fillStyle='#4a5a70'; x.font='9px monospace';
+  x.fillStyle='#616878'; x.font='9px monospace';
   x.fillText('-20%',6,h-2); x.textAlign='right'; x.fillText('+20%',w-6,h-2); x.textAlign='left';
   const dn=pts[0].pnl, up=pts[pts.length-1].pnl;
   document.getElementById('rklabel').innerHTML= rows.length
@@ -1149,7 +1235,7 @@ function renderMemo(){
   document.getElementById('roundlog').innerHTML=logs.map(l=>
     `<div style="padding:8px 0;border-bottom:1px solid #141c27;font-size:11.5px;line-height:1.55">
        <span class="acc" style="color:var(--acc);font-size:9.5px;letter-spacing:.1em">ROUND ${l.round}</span>
-       <span class="dim" style="font-size:9.5px;margin-left:8px">${l.by||''}</span>
+       <span class="dim" style="font-size:9.5px;margin-left:8px">${esc(l.by||'')}</span>
        <div style="margin-top:3px">${esc(l.text)}</div>
      </div>`).join('');
 }
@@ -1182,18 +1268,21 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape')closeTk();});
 // auto-resume: an existing token reclaims the same seat, so a refresh is seamless
 (async()=>{
   const sc=localStorage.getItem('mcc_code');
-  if(!sc) return;
+  if(!sc){ return; }
   document.getElementById('lc').value=sc;
   document.getElementById('lp').value=localStorage.getItem('mcc_person')||'';
+  // If the player signed out, show the login screen rather than auto-resuming.
+  if(localStorage.getItem('mcc_signedout')){ loadRoles(); return; }
   const tok=localStorage.getItem('mcc_token_'+sc);
   if(tok){
     const r=await api('/api/join',{code:sc,token:tok});
     if(r.ok){
-      CODE=sc; TOKEN=r.token; ROLE=(r.roles||[])[0];
+      CODE=sc; TOKEN=r.token; ROLE=(r.roles||[])[0]; if(r.gameId) GAMEID=r.gameId;
       document.getElementById('login').style.display='none';
       poll(); POLL=setInterval(poll, r.poll||2500);
       return;
     }
+    localStorage.removeItem('mcc_token_'+sc);   // token no longer valid (game ended/reset) -> fresh start
   }
   loadRoles();
 })();
