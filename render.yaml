@@ -2,14 +2,25 @@ services:
   - type: web
     name: financial-trading-system-simulator
     runtime: node
-    plan: free
+    plan: free            # fine for testing; for a live event use a paid instance + a persistent disk
     buildCommand: echo "no build step, zero dependencies"
     startCommand: node server.js
     healthCheckPath: /healthz
     envVars:
-      # Change this before you deploy. Anyone with it can drive the market.
+      # REQUIRED: set a strong admin passcode in the Render dashboard (Environment tab).
+      # It is deliberately NOT stored in this file, so it never lands in your git repo.
+      # If you leave it unset, the server generates a random passcode at boot and
+      # prints it once to the service logs.
       - key: ADMIN_PASS
-        value: changeme
-      # Set to 1 only if you want several devices sharing one team code.
-      - key: ALLOW_MULTI
+        sync: false
+      # Keep this at 0. Players must enter their team passcode (shown in the admin
+      # console, next to each team) to take a seat, which stops anyone from joining
+      # or squatting another team. Set to 1 only if you deliberately want fully open
+      # join with no passcodes.
+      - key: ALLOW_OPEN_JOIN
         value: "0"
+      # Optional: set this to your public URL (e.g. https://yourapp.onrender.com) so a
+      # free instance gets pinged every 10 min and does not sleep during the quiet
+      # stretch between setup and kickoff.
+      - key: KEEPALIVE_URL
+        sync: false
