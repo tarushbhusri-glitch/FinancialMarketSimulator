@@ -17,11 +17,32 @@ const http = require('http');
 const fs   = require('fs');
 const path = require('path');
 const os   = require('os');
+const crypto = require('crypto');
 const { SCENARIOS, CAMPAIGNS, NOISE, hintsFor } = require('./scenarios.js');
 const SCEN = Object.fromEntries(SCENARIOS.map(s=>[s.id,s]));
 
 const PORT        = process.env.PORT || 8080;
-const ADMIN_PASS  = process.env.ADMIN_PASS || 'simulator';
+
+/* Admin passcode. Never ship a guessable default: if ADMIN_PASS is missing, or is
+   still one of the well-known placeholder values, generate a strong random one at
+   boot and print it to the log so the facilitator can read it from the host
+   dashboard. Set ADMIN_PASS in the environment to choose your own. */
+const WEAK_PASS = new Set(['','simulator','changeme','password','admin','123456']);
+let ADMIN_PASS = process.env.ADMIN_PASS || '';
+let ADMIN_PASS_GENERATED = false;
+if(WEAK_PASS.has(String(ADMIN_PASS).toLowerCase())){
+  ADMIN_PASS = crypto.randomBytes(9).toString('base64').replace(/[^A-Za-z0-9]/g,'').slice(0,12) || 'set-ADMIN_PASS';
+  ADMIN_PASS_GENERATED = true;
+}
+
+/* Players must present their team passcode to take a seat, so nobody can wander
+   into another team book or squat its seats. Set ALLOW_OPEN_JOIN=1 to restore the
+   old open-join behaviour (not recommended for a live competition). */
+const ALLOW_OPEN_JOIN = process.env.ALLOW_OPEN_JOIN === '1';
+const SECRET_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';   // no I/O/0/1
+function genSecret(n=4){ let s=''; for(let i=0;i<n;i++) s+=SECRET_ALPHABET[crypto.randomBytes(1)[0]%SECRET_ALPHABET.length]; return s; }
+function genId(){ return crypto.randomBytes(8).toString('hex'); }
+
 const NUM_TEAMS   = 17;
 const START_CAP   = 100_000_000;      // $100mm per fund
 const SAVE_FILE   = path.join(__dirname, 'gamestate.json');
@@ -118,7 +139,9 @@ function initMarket(){
     creditHY: 380,      // bp — drives CDS on ORC
     creditIG: 115,      // bp — drives CDS on ATB
     index   : 0,
-    indexVol: 0.22
+    indexVol: 0.22,
+    impact  : {},       // bounded, decaying price offset from team demand/supply
+    flow    : {}        // signed pressure accumulated between ticks
   };
   EQUITIES.forEach(e => M.equities[e.id] = { ...e });
   M.index = computeIndex();
@@ -334,6 +357,7 @@ let S = null;
 function freshTeam(code){
   return {
     code, name:'', joined:false, bot:false, strategy:null,
+    teamSecret: genSecret(),   // required to take a seat on this team
     seats:{},            // token -> {role, person, lastSeen}
     roundLog:[],         // scribe's per-round decision log, separate from the memo
     ideas:[],            // the desk's ticket queue
@@ -345,6 +369,7 @@ function freshTeam(code){
 }
 
 function freshState(){
+  seed = crypto.randomBytes(4).readUInt32LE(0) >>> 0 || 1;   // fresh, unpredictable market path each new game
   initMarket();
   const teams = {};
   for(let i=1;i<=NUM_TEAMS;i++){
@@ -352,9 +377,10 @@ function freshState(){
     teams[code] = freshTeam(code);
   }
   return {
+    gameId: genId(),
     phase:'lobby', round:0, roundEndsAt:0, roundLengthSec:360, lengthOverride:false,
     mode:'campaign', campaignId:'CLASSIC', rounds: buildRounds('campaign','CLASSIC'),
-    newsMode:'role', paused:false, candles:{}, tickCount:0, priceVersion:0,
+    newsMode:'role', paused:false, chaosLo:0.45, chaosHi:2.2, impactOn:false, impactK:1, candles:{}, tickCount:0, priceVersion:0,
     book: buildBook(0), teams, news:[], log:[],
     startedAt: Date.now()
   };
@@ -365,7 +391,7 @@ function freshState(){
    Each member takes a named seat on their team's desk and gets a private token.
    Permissions follow the seat's role, so an analyst physically cannot execute.
    ------------------------------------------------------------ */
-const newToken = () => Math.random().toString(36).slice(2) + Date.now().toString(36);
+const newToken = () => crypto.randomBytes(24).toString('hex');
 
 /* ------------------------------------------------------------
    DESK ROLES — 14 seats per team
@@ -582,12 +608,18 @@ function migrate(st){
       if(!s.joinedAt) s.joinedAt = Date.now();
     }
     delete t.token;
+    if(!t.teamSecret) t.teamSecret = genSecret();
     if(!Array.isArray(t.ideas)) t.ideas = [];
     if(!t.ideaSeq) t.ideaSeq = (t.ideas.reduce((a,i)=>Math.max(a,i.id||0),0)) + 1;
     if(!Array.isArray(t.navHistory) || !t.navHistory.length) t.navHistory = [START_CAP];
     if(!Array.isArray(t.pushed)) t.pushed = [];
     if(!Array.isArray(t.roundLog)) t.roundLog = [];
   }
+  if(!st.gameId) st.gameId = genId();
+  if(st.chaosLo==null) st.chaosLo = 0.45;
+  if(st.chaosHi==null) st.chaosHi = 2.2;
+  if(st.impactOn==null) st.impactOn = false;
+  if(st.impactK==null)  st.impactK = 1;
   if(!st.bookVersion) st.bookVersion = 1;
   if(!st.rounds || !st.rounds.length) st.rounds = buildRounds('campaign','CLASSIC');
   if(!st.candles) st.candles = {};
@@ -709,6 +741,7 @@ function executeTrade(team, instId, qty){
   S.log.unshift({ t:Date.now(), team:team.code, name:team.name,
                   msg:`${qty>0?'BUY':'SELL'} ${Math.abs(qty)} ${instId} @ ${fill.toFixed(2)}` });
   S.log = S.log.slice(0,300);
+  if(!team.bot && S.impactOn) addFlow(inst, qty, fill);   // human demand/supply moves the market
   return {ok:true, msg:`Filled ${qty>0?'BUY':'SELL'} ${Math.abs(qty)} ${instId} @ ${fill.toFixed(2)}`, fill};
 }
 
@@ -1072,25 +1105,84 @@ function recordCandles(){
   });
 }
 
+/* ------------------------------------------------------------
+   MARKET IMPACT (demand / supply across teams)
+   Human trades add signed pressure per underlying to M.flow. Once per tick that
+   pressure is folded into a small, decaying, hard-capped offset on the round's
+   price target (M.impact): buying lifts a price, selling lowers it, for everyone.
+   Every cap sits BELOW the scenario's "material move", so the news direction (and
+   the analyst scoring that rides on it) always wins; the offset fades when trading
+   stops. Off by default; bots never contribute. Uses no RNG, so with the feature
+   off the market path is byte-for-byte identical to before. */
+const IMPACT_REF   = 100_000_000;   // $ notional that counts as one unit of pressure
+const IMPACT_BASE  = 0.9;           // base responsiveness (scaled by the admin strength)
+const IMPACT_DECAY = 0.88;          // per-tick fade of the standing offset
+const IMPACT_KEYS  = ['HLX','NVR','ATB','ORC','VDT','KYN','rate5y','rate2y','creditHY','creditIG'];
+const EQ = ['HLX','NVR','ATB','ORC','VDT','KYN'];
+// absolute caps per key, each deliberately below the scenario material-move floor
+const IMPACT_CAP  = { HLX:0.009,NVR:0.009,ATB:0.009,ORC:0.009,VDT:0.009,KYN:0.009,
+                      rate5y:0.015, rate2y:0.015, creditHY:7, creditIG:7 };
+// converts normalised pressure into each key's offset units (fraction / rate pts / bp)
+const IMPACT_UNIT = { HLX:0.0125,NVR:0.0125,ATB:0.0125,ORC:0.0125,VDT:0.0125,KYN:0.0125,
+                      rate5y:0.03, rate2y:0.03, creditHY:80, creditIG:80 };
+
+function addFlow(inst, qty, px){
+  if(!inst) return;
+  M.flow = M.flow || {};
+  const bump=(k,v)=>{ if(k && IMPACT_CAP[k]!=null && isFinite(v)) M.flow[k]=(M.flow[k]||0)+v; };
+  const dn = px*qty*inst.mult;                               // signed $ notional
+  switch(inst.kind){
+    case 'EQUITY': bump(inst.under, dn); break;              // under === id for equities
+    case 'FUTURE':
+      if(inst.id==='CRD') bump('ORC', dn);                  // crude -> the oil name
+      else EQ.forEach(e=>bump(e, dn/6));                    // index future -> whole basket
+      break;
+    case 'OPTION': {
+      const u=inst.under;
+      const spot = M.equities[u] ? M.equities[u].px : (u==='GBX'?M.index:px);
+      const ddn = (inst.delta||0)*qty*inst.mult*spot;        // delta-notional, signed (put buy -> underlier down)
+      if(u==='GBX') EQ.forEach(e=>bump(e, ddn/6)); else bump(u, ddn);
+      break;
+    }
+    case 'SWAP': bump(inst.under==='RATE2'?'rate2y':'rate5y', -dn*0.25); break;  // buy receive-fixed -> rate down
+    case 'CDS':  bump(inst.under==='ATB'?'creditIG':'creditHY', dn*0.25); break; // buy protection -> spread up
+  }
+}
+
+function stepImpact(){
+  M.impact = M.impact || {};
+  const flow = M.flow || {};
+  const K = IMPACT_BASE * (S.impactK || 1);
+  for(const k of IMPACT_KEYS){
+    let off = (M.impact[k]||0) * IMPACT_DECAY;                       // fade the standing offset
+    if(S.impactOn) off += K * (flow[k]||0) / IMPACT_REF * IMPACT_UNIT[k];
+    const cap = IMPACT_CAP[k];
+    M.impact[k] = Math.max(-cap, Math.min(cap, off));
+  }
+  M.flow = {};                                                       // pressure consumed this tick
+}
+
 function tickMarket(){
   if(S.phase !== 'open') return;
   if(S.roundEndsAt && Date.now() > S.roundEndsAt){ S.phase='closed'; return; }
   const T = M.target || {};
   const pull = 0.045;                       // convergence speed toward target
+  stepImpact();                             // fold team demand/supply into bounded, decaying target offsets
 
   EQUITIES.forEach(e=>{
     const m = M.equities[e.id];
-    const tgt = T[e.id] != null ? T[e.id] : m.px;
+    const base = T[e.id] != null ? T[e.id] : m.px;
+    const tgt = base * (1 + (M.impact[e.id]||0));    // demand/supply nudges the target (0 when off)
     const drift = (tgt - m.px) * pull;
     const noise = m.px * gauss() * m.vol * 0.010;   // per-tick jitter
     m.px = Math.max(0.5, m.px + drift + noise);
   });
   const step = (cur, tgt, sd) =>
     tgt == null ? cur : cur + (tgt-cur)*pull + gauss()*sd;
-  M.rate5y   = step(M.rate5y,   T.rate5y,   0.004);
-  M.rate2y   = step(M.rate2y,   T.rate2y,   0.005);
-  M.creditHY = Math.max(60, step(M.creditHY, T.creditHY, 0.8));
-  M.creditIG = Math.max(25, step(M.creditIG, T.creditIG, 0.4));
+  M.rate5y   = step(M.rate5y,   T.rate5y  !=null ? T.rate5y  +(M.impact.rate5y  ||0) : null, 0.004);
+  M.rate2y   = step(M.rate2y,   T.rate2y  !=null ? T.rate2y  +(M.impact.rate2y  ||0) : null, 0.005);
+  M.creditHY = Math.max(60, step(M.creditHY, T.creditHY!=null ? T.creditHY+(M.impact.creditHY||0) : null, 0.8));
+  M.creditIG = Math.max(25, step(M.creditIG, T.creditIG!=null ? T.creditIG+(M.impact.creditIG||0) : null, 0.4));
   M.index    = computeIndex();
 
   // reprice the traded book off the new levels
@@ -1114,6 +1206,9 @@ function priceMap(visible){
   return p;
 }
 
+const CHAOS_LO = 0.45, CHAOS_HI = 2.2;   // per-round intensity band (geometric, ~centred on 1x)
+const CHAOS_JITTER = 0.15;               // independent per-driver wobble, clamped so the sign never flips
+
 function advanceRound(){
   if(S.round >= MAX_ROUNDS){ endGame(); return; }
   // snapshot prices before the move so momentum bots have something to read
@@ -1130,21 +1225,44 @@ function advanceRound(){
      to show and reacting quickly is worth something. */
   const GAP = 0.45;
   M.target = M.target || {};
+
+  /* ---- chaotic-but-fair sizing --------------------------------------------
+     DIRECTION always matches the scenario and its private hints; only the SIZE
+     is random. One intensity multiplier is drawn for the whole round (so the
+     scenario's intended lead mover stays the lead, and the hints stay honest),
+     with a small independent per-driver wobble on top. Effects large enough to
+     brief a desk are floored so a hinted call always clearly lands; everything
+     is sign-locked and capped so a move can never flip or balloon absurdly. */
+  const clo = S.chaosLo || CHAOS_LO, chi = S.chaosHi || CHAOS_HI;     // facilitator-adjustable band
+  const chaos = clo * Math.pow(chi/clo, rnd());                       // geometric, ~centred on 1x
+  const wob   = () => Math.max(0.5, Math.min(1.5, 1 + CHAOS_JITTER*gauss()));
+  const sized = v => v ? Math.sign(v)*Math.abs(v)*chaos*wob() : 0;    // keeps sign, random size
+  const ivAdj = x => Math.max(0.2, 1 + (x-1)*chaos*wob());            // vol stays on its side of 1
+
   EQUITIES.forEach(e=>{
     const m = M.equities[e.id];
-    const shock = (d[e.id]||0);
+    const raw = d[e.id]||0;
+    let shock = sized(raw);
+    if(Math.abs(raw) >= 0.05) shock = Math.sign(raw)*Math.max(Math.abs(shock), 0.03); // hinted move must land
+    shock = Math.sign(shock)*Math.min(Math.abs(shock), 0.60);                          // sane cap
     const idio  = gauss()*m.vol*0.20*Math.sqrt(0.25);
     const full  = m.px * (1 + shock + idio);
     m.px = Math.max(0.5, m.px + (full - m.px)*GAP);
     M.target[e.id] = Math.max(0.5, full);
-    m.iv = Math.min(1.5, Math.max(0.08, m.iv * sc.iv * (1 + gauss()*0.05)));
+    m.iv = Math.min(1.5, Math.max(0.08, m.iv * ivAdj(sc.iv) * (1 + gauss()*0.05)));
   });
-  M.indexVol = Math.min(1.2, Math.max(0.07, M.indexVol*sc.iv*(1+gauss()*0.04)));
+  M.indexVol = Math.min(1.2, Math.max(0.07, M.indexVol*ivAdj(sc.iv)*(1+gauss()*0.04)));
 
-  const r5t = M.rate5y + sc.r5 + gauss()*0.06;
-  const r2t = M.rate2y + sc.r2 + gauss()*0.08;
-  const hyt = Math.max(80, M.creditHY + sc.hy + gauss()*8);
-  const igt = Math.max(30, M.creditIG + sc.ig + gauss()*4);
+  // Rates and credit: same sign as the scenario, random size, hinted moves floored.
+  let r5m = sized(sc.r5), r2m = sized(sc.r2), hym = sized(sc.hy), igm = sized(sc.ig);
+  if(Math.abs(sc.r5) >= 0.20) r5m = Math.sign(sc.r5)*Math.max(Math.abs(r5m), 0.12);
+  if(Math.abs(sc.r2) >= 0.25) r2m = Math.sign(sc.r2)*Math.max(Math.abs(r2m), 0.15);
+  if(Math.abs(sc.hy) >= 35)   hym = Math.sign(sc.hy)*Math.max(Math.abs(hym), 20);
+  if(Math.abs(sc.ig) >= 15)   igm = Math.sign(sc.ig)*Math.max(Math.abs(igm), 10);
+  const r5t = M.rate5y + r5m + gauss()*0.06;
+  const r2t = M.rate2y + r2m + gauss()*0.08;
+  const hyt = Math.max(80, M.creditHY + hym + gauss()*8);
+  const igt = Math.max(30, M.creditIG + igm + gauss()*4);
   M.rate5y += (r5t-M.rate5y)*GAP;  M.target.rate5y = r5t;
   M.rate2y += (r2t-M.rate2y)*GAP;  M.target.rate2y = r2t;
   M.creditHY += (hyt-M.creditHY)*GAP; M.target.creditHY = hyt;
@@ -1218,8 +1336,8 @@ function scoreTeam(t){
    HTTP
    ------------------------------------------------------------ */
 function send(res, code, body, type='application/json'){
-  res.writeHead(code, {'Content-Type':type, 'Access-Control-Allow-Origin':'*',
-                       'Cache-Control':'no-store'});
+  res.writeHead(code, {'Content-Type':type, 'Cache-Control':'no-store',
+                       'X-Content-Type-Options':'nosniff'});
   res.end(type==='application/json' ? JSON.stringify(body) : body);
 }
 function file(res, name, type){
@@ -1227,19 +1345,46 @@ function file(res, name, type){
     : send(res,200,d.toString(),type));
 }
 
+/* ------------------------------------------------------------
+   RATE LIMITING + ADMIN AUTH  (per-IP, in-memory)
+   Only FAILED attempts are throttled, so a room full of students behind one
+   shared IP is never locked out of normal play, while password guessing and
+   seat-flooding are stopped.
+   ------------------------------------------------------------ */
+const adminFails = new Map();   // ip -> {n, until}
+const joinFails  = new Map();   // ip -> {n, until}
+function tooMany(map, ip){ const e = map.get(ip); return !!(e && e.until > Date.now()); }
+function noteFail(map, ip, max, cooldownMs){
+  const e = map.get(ip) || {n:0, until:0};
+  e.n++; if(e.n >= max){ e.until = Date.now()+cooldownMs; e.n = 0; }
+  map.set(ip, e);
+}
+function clearFail(map, ip){ map.delete(ip); }
+function adminGate(q, ip){                     // null = OK, else an error object to return
+  if(tooMany(adminFails, ip)) return {ok:false, msg:'Too many attempts. Wait a minute and try again.'};
+  if(q.pass !== ADMIN_PASS){ noteFail(adminFails, ip, 10, 60000); return {ok:false, msg:'Bad passcode'}; }
+  clearFail(adminFails, ip);
+  return null;
+}
+function clientIp(req){
+  const xf = (req.headers['x-forwarded-for']||'').split(',')[0].trim();
+  return xf || (req.socket && req.socket.remoteAddress) || 'unknown';
+}
+
 const server = http.createServer((req,res)=>{
   const u = new URL(req.url,'http://x');
   const q = Object.fromEntries(u.searchParams);
+  const ip = clientIp(req);
 
   if(req.method==='POST'){
     let body=''; req.on('data',c=>{ body+=c; if(body.length>1e6) req.destroy(); });
-    req.on('end',()=>{ let d={}; try{ d=JSON.parse(body||'{}'); }catch(e){} handle(u.pathname,{...q,...d},res); });
+    req.on('end',()=>{ let d={}; try{ d=JSON.parse(body||'{}'); }catch(e){} handle(u.pathname,{...q,...d},res,ip); });
     return;
   }
-  handle(u.pathname,q,res);
+  handle(u.pathname,q,res,ip);
 });
 
-function handle(p, q, res){
+function handle(p, q, res, ip){
   // auto-close round on timer
   if(S.phase==='open' && S.roundEndsAt && Date.now()>S.roundEndsAt) S.phase='closed';
 
@@ -1302,7 +1447,7 @@ function handle(p, q, res){
         bookVersion, bookCached: cached,
         px: priceMap(visible), priceVersion:S.priceVersion||0,
         candles: cand, candleCount: total, live: !S.paused && S.phase==='open',
-        ok:true, phase:S.phase, round:S.round, maxRounds:MAX_ROUNDS,
+        ok:true, gameId:S.gameId, phase:S.phase, round:S.round, maxRounds:MAX_ROUNDS,
         secsLeft: S.phase==='open' ? Math.max(0,Math.round((S.roundEndsAt-Date.now())/1000)) : 0,
         news:S.news.slice(0,6), limits:LIMITS,
         me:{ person:seat.person, roles:cap.roles, roleLabel:cap.labels.join(' + '),
@@ -1349,18 +1494,34 @@ function handle(p, q, res){
     }
 
     case '/api/join': {
+      if(tooMany(joinFails, ip))
+        return send(res,200,{ok:false,msg:'Too many failed attempts from here. Wait a minute.'});
       const t = S.teams[String(q.code||'').toUpperCase()];
-      if(!t) return send(res,200,{ok:false,msg:'Invalid team code'});
+      if(!t){ noteFail(joinFails, ip, 30, 60000); return send(res,200,{ok:false,msg:'Invalid team code'}); }
       if(t.bot) return send(res,200,{ok:false,msg:'That code is running as a demo fund.'});
 
-      // resume an existing seat after a refresh
+      // Resume an existing seat after a refresh or a sign-out: no passcode needed,
+      // you keep your seat and your book. But once the facilitator has ENDED the
+      // game, the old seat is not resumed and the next login starts fresh.
       if(q.token && t.seats[q.token]){
+        if(S.phase === 'ended')
+          return send(res,200,{ok:false, msg:'The game has ended. Log in to join the new game.', ended:true});
         const s = t.seats[q.token];
         if(q.person) s.person = String(q.person).slice(0,32);
+        s.lastSeen = Date.now();
         const c = capabilities(t, s);
         save();
         return send(res,200,{ok:true, token:q.token, roles:seatRoles(s),
-          roleLabel:c.labels.join(' + '), name:t.name, poll:c.poll});
+          roleLabel:c.labels.join(' + '), name:t.name, poll:c.poll, gameId:S.gameId});
+      }
+
+      // A brand-new seat needs the team passcode (unless open-join is enabled).
+      if(!ALLOW_OPEN_JOIN){
+        const sec = String(q.secret||'').trim().toUpperCase();
+        if(sec !== String(t.teamSecret||'').toUpperCase()){
+          noteFail(joinFails, ip, 30, 60000);
+          return send(res,200,{ok:false, msg:'Wrong team passcode. Ask your facilitator for the team passcode.'});
+        }
       }
 
       // one person may hold several seats
@@ -1396,7 +1557,7 @@ function handle(p, q, res){
       const c = capabilities(t, t.seats[tok]);
       save();
       return send(res,200,{ok:true, token:tok, roles:want,
-        roleLabel:c.labels.join(' + '), name:t.name, poll:c.poll});
+        roleLabel:c.labels.join(' + '), name:t.name, poll:c.poll, gameId:S.gameId});
     }
 
     /* Pick up or drop a spare seat mid-game, for a short-handed desk */
@@ -1503,7 +1664,8 @@ function handle(p, q, res){
 
     /* ---- admin ---- */
     case '/api/admin': {
-      if(q.pass !== ADMIN_PASS) return send(res,200,{ok:false,msg:'Bad passcode'});
+      const gate = adminGate(q, ip);
+      if(gate) return send(res,200,gate);
       const act = q.action;
       if(act==='next')      advanceRound();
       if(act==='open')    { S.phase='open';   S.roundEndsAt = Date.now()+S.roundLengthSec*1000; }
@@ -1523,6 +1685,17 @@ function handle(p, q, res){
       if(act==='beginner')  S.beginner = !S.beginner;
       if(act==='pause')     S.paused   = !S.paused;
       if(act==='newsmode')  S.newsMode = ['same','role','full'].includes(q.mode)?q.mode:'role';
+      if(act==='chaos'){
+        let lo=Number(q.lo), hi=Number(q.hi);
+        if(isFinite(lo)&&isFinite(hi)){
+          lo=Math.min(Math.max(lo,0.1),1); hi=Math.min(Math.max(hi,1),4);
+          if(lo<hi){ S.chaosLo=lo; S.chaosHi=hi; }
+        }
+      }
+      if(act==='impact'){
+        if(q.on!=null) S.impactOn = !!q.on;
+        if(q.k!=null){ const k=Number(q.k); if(isFinite(k)) S.impactK = Math.max(0.1, Math.min(3, k)); }
+      }
       if(act==='campaign'){ S.campaignId = String(q.campaign||'CLASSIC');
                             S.mode='campaign';
                             if(!S.round) S.rounds = buildRounds('campaign', S.campaignId); }
@@ -1553,7 +1726,7 @@ function handle(p, q, res){
                                S.teams[c] = freshTeam(c); }
       save();
       return send(res,200,{
-        ok:true, phase:S.phase, round:S.round, maxRounds:MAX_ROUNDS,
+        ok:true, gameId:S.gameId, phase:S.phase, round:S.round, maxRounds:MAX_ROUNDS,
         demoFilled, demoActive: Object.values(S.teams).some(t=>t.bot),
         beginner: !!S.beginner,
         people: Object.values(S.teams).filter(t=>!t.bot).flatMap(t=>
@@ -1568,7 +1741,9 @@ function handle(p, q, res){
         roundLengthSec:S.roundLengthSec, lengthOverride:!!S.lengthOverride,
         nextMins: S.round<MAX_ROUNDS ? (ROUND_MINS[S.round]||5) : 0,
         totalMins: ROUND_MINS.reduce((a,b)=>a+b,0),
-        paused: !!S.paused, newsMode: S.newsMode||'role',
+        paused: !!S.paused, openJoin: ALLOW_OPEN_JOIN, newsMode: S.newsMode||'role',
+        chaosLo: S.chaosLo!=null?S.chaosLo:0.45, chaosHi: S.chaosHi!=null?S.chaosHi:2.2,
+        impactOn: !!S.impactOn, impactK: S.impactK!=null?S.impactK:1,
         mode: S.mode||'campaign', campaignId: S.campaignId||'CLASSIC',
         campaigns: CAMPAIGNS.map(c=>({id:c.id,name:c.name,desc:c.desc})),
         rounds: (S.rounds||[]).map((id,i)=>({ idx:i, id,
@@ -1582,7 +1757,7 @@ function handle(p, q, res){
         nextHeadline: S.round<MAX_ROUNDS ? (scenarioFor(S.round+1).h||'') : 'end of game',
         teams: Object.values(S.teams).map(t=>{
           const a = markToMarket(t);
-          return { code:t.code, name:t.name, joined:t.joined, nav:a.nav,
+          return { code:t.code, name:t.name, secret:t.teamSecret, joined:t.joined, nav:a.nav,
                    ret:a.nav/START_CAP-1, gross:a.gross/Math.max(a.nav,1),
                    net:a.net/Math.max(a.nav,1), vega:a.vega,
                    breaches:checkLimits(t,a).length, trades:t.trades.length,
@@ -1606,16 +1781,17 @@ function handle(p, q, res){
     /* Full session snapshot. Free hosts recycle containers without warning, so
        this is the recovery path: download before you start, upload to rebuild. */
     case '/api/backup': {
-      if(q.pass !== ADMIN_PASS) return send(res,200,{ok:false,msg:'denied'});
+      const g = adminGate(q, ip); if(g) return send(res,200,g);
       return send(res,200,{ok:true, savedAt:Date.now(), state:S, market:M, seed});
     }
 
     case '/api/restore': {
-      if(q.pass !== ADMIN_PASS) return send(res,200,{ok:false,msg:'denied'});
+      const g = adminGate(q, ip); if(g) return send(res,200,g);
       try{
         const d = typeof q.data==='string' ? JSON.parse(q.data) : q.data;
         if(!d || !d.state || !d.state.teams) throw new Error('bad payload');
-        S = d.state; M = d.market; seed = d.seed || seed;
+        S = migrate(d.state); M = d.market; seed = d.seed || seed;
+        if(!S.gameId) S.gameId = genId();
         S.book = buildBook(S.round);
         retainHeldOptions(S.book, S.round);
         S.phase = 'closed'; S.roundEndsAt = 0;   // never resume mid-round unattended
@@ -1626,7 +1802,7 @@ function handle(p, q, res){
     }
 
     case '/api/export': {
-      if(q.pass !== ADMIN_PASS) return send(res,200,'denied','text/plain');
+      const g = adminGate(q, ip); if(g) return send(res,200,g.msg,'text/plain');
       const rows = [['Rank','Code','Team','Final NAV','Return %','Sharpe','Max DD %','Breaches','Trades',
                      'P&L (40)','Sharpe (25)','Risk (20)','Memo (15)','TOTAL (100)']];
       Object.values(S.teams).filter(t=>t.joined).map(t=>({code:t.code,name:t.name,...scoreTeam(t)}))
@@ -1686,8 +1862,14 @@ server.listen(PORT, '0.0.0.0', ()=>{
   console.log('  \u00A9 %s %s. All rights reserved.\n', '2026', 'Tarush Bhusri');
   console.log(`  Team terminals :  ${base}/`);
   console.log(`  Admin console  :  ${base}/admin`);
-  console.log(`  Admin passcode :  ${ADMIN_PASS}\n`);
-  console.log('  Team codes     :  TEAM01 … TEAM17');
+  if(ADMIN_PASS_GENERATED){
+    console.log(`  Admin passcode :  ${ADMIN_PASS}   <-- GENERATED. Set ADMIN_PASS to choose your own.\n`);
+  } else {
+    console.log('  Admin passcode :  (from the ADMIN_PASS environment variable)\n');
+  }
+  if(ALLOW_OPEN_JOIN)
+    console.log('  WARNING: ALLOW_OPEN_JOIN=1 — anyone can join any team with no passcode.');
+  console.log('  Team codes     :  TEAM01 … TEAM17  (each team has its own passcode; see the admin console)');
   console.log(hosted
     ? '  Hosted. Share the URL above with anyone, anywhere.\n'
     : '  Local. Teams must be on the same Wi-Fi as this machine.\n');
