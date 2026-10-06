@@ -405,7 +405,7 @@ const HOLD_SECS          = 45;     // a risk hold lapses after this, so it canno
 const ROLES = {
   PM:       { label:'Portfolio Manager',      cap:1, exec:'full',    poll:2000,
               desc:'Sole authority on large trades. Approves or rejects the queue.' },
-  TRADER:   { label:'Execution Trader',       cap:1, exec:'limited', poll:2000,
+  TRADER:   { label:'Execution Trader',       cap:2, exec:'limited', poll:2000,
               desc:'Executes tickets below the approval threshold. Works the blotter.' },
   RISK:     { label:'Risk Manager',           cap:1, exec:'none',    poll:2000, canHold:true,
               desc:'Owns the limit framework. Can hold any ticket with a written reason.' },
@@ -415,14 +415,15 @@ const ROLES = {
               desc:'Company research. Submit single-name ideas with a thesis.' },
   MACRO:    { label:'Macro & Rates Analyst',  cap:2, exec:'none',    poll:4000, focus:'RATES',
               desc:'Curve, swaps and futures. Submit macro expressions.' },
-  CREDIT:   { label:'Credit Analyst',         cap:1, exec:'none',    poll:4000, focus:'CREDIT',
+  CREDIT:   { label:'Credit Analyst',         cap:2, exec:'none',    poll:4000, focus:'CREDIT',
               desc:'CDS and spreads. Submit credit ideas.' },
   DERIV:    { label:'Derivatives Specialist', cap:2, exec:'none',    poll:4000, focus:'OPTION',
               desc:'Options chain and Greeks. Submit hedges and structures.' },
   SCRIBE:   { label:'Scribe',                 cap:1, exec:'none',    poll:5000,
               desc:'Writes the investment memo. Worth 15 points.' }
 };
-const SEATS_PER_TEAM = Object.values(ROLES).reduce((a,r)=>a+r.cap,0);   // 14
+const SEATS_PER_TEAM = 15;   // hard per-team roster cap. TRADER and CREDIT each allow a 2nd
+                             // seat, but only ONE of the two extras may be filled (15, not 16).
 
 // Who acts as PM when the PM seat is empty. Also the order shown on the roster.
 const SENIORITY = ['PM','TRADER','RESEARCH','RISK','DERIV','MACRO','CREDIT','EQUITY','SCRIBE'];
@@ -594,7 +595,26 @@ function personalPoints(seat){
   return (s.right||0)*10 - (s.wrong||0)*2 + (s.filled||0)*4 + (s.holds||0)*6;
 }
 
-function save(){ try{ fs.writeFileSync(SAVE_FILE, JSON.stringify({S, M, seed})); }catch(e){} }
+/* Persistence is throttled + async: a mutation marks the state dirty and a single
+   coalesced write lands at most ~once per second, written to a temp file then
+   atomically renamed. This stops heavy trading from blocking the event loop with
+   dozens of full-state writes per second. Worst case on a crash is losing under a
+   second of activity, which the 10s interval, the SIGTERM flush and manual BACKUP
+   all cover. State is served from memory, so no request depends on the file. */
+let _saveDirty=false, _saveTimer=null, _saving=false;
+function flushSave(){
+  _saveTimer=null;
+  if(!_saveDirty || _saving) return;
+  _saveDirty=false; _saving=true;
+  let data; try{ data=JSON.stringify({S,M,seed}); }catch(e){ _saving=false; return; }
+  fs.writeFile(SAVE_FILE+'.tmp', data, err=>{
+    if(!err){ try{ fs.renameSync(SAVE_FILE+'.tmp', SAVE_FILE); }catch(e){} }
+    _saving=false;
+    if(_saveDirty && !_saveTimer) _saveTimer=setTimeout(flushSave, 1000);
+  });
+}
+function save(){ _saveDirty=true; if(!_saveTimer && !_saving) _saveTimer=setTimeout(flushSave, 1000); }
+function saveSync(){ try{ fs.writeFileSync(SAVE_FILE, JSON.stringify({S,M,seed})); }catch(e){} }
 /* Saved state from an earlier build can have the old shape: `seats` as a counter
    and a single `token` per team. Normalise on load so a redeploy over a live
    service degrades to "everyone logs in again" rather than breaking seating. */
@@ -1539,6 +1559,11 @@ function handle(p, q, res, ip){
           return send(res,200,{ok:false,
             msg:`All ${ROLES[r].cap} ${ROLES[r].label} seat(s) on ${t.code} are taken.`});
 
+      const curSlots = Object.values(t.seats).reduce((n,s)=>n+seatRoles(s).length,0);
+      if(curSlots + want.length > SEATS_PER_TEAM)
+        return send(res,200,{ok:false,
+          msg:`${t.code} is full (${SEATS_PER_TEAM} seats). Try another team or a different role.`});
+
       if(q.name && !t.name) t.name = String(q.name).slice(0,40);
       t.joined = true;
       const tok = newToken();
@@ -1575,6 +1600,9 @@ function handle(p, q, res, ip){
         if(have.includes(r)) return send(res,200,{ok:false,msg:'You already hold that seat.'});
         if(seatCounts(t)[r] >= ROLES[r].cap)
           return send(res,200,{ok:false,msg:`The ${ROLES[r].label} seat is taken.`});
+        const curSlots = Object.values(t.seats).reduce((n,s)=>n+seatRoles(s).length,0);
+        if(curSlots + 1 > SEATS_PER_TEAM)
+          return send(res,200,{ok:false,msg:`${t.code} is full (${SEATS_PER_TEAM} seats).`});
         seat.roles = [...have, r];
       }
       const c = capabilities(t, seat);
@@ -1828,9 +1856,10 @@ function leaderboard(){
    ------------------------------------------------------------ */
 if(!load()) S = freshState();
 
-// Periodic autosave. Every mutating request already saves; this covers the gap
-// where a container is recycled between trades.
+// Periodic flush fallback, plus a synchronous flush on shutdown so a redeploy or
+// restart never loses the live session.
 setInterval(save, 10000);
+for(const sig of ['SIGTERM','SIGINT']) process.on(sig, ()=>{ saveSync(); process.exit(0); });
 
 // the market breathes
 setInterval(()=>{ try{ if(!S.paused) tickMarket(); }catch(e){} }, TICK_MS);
