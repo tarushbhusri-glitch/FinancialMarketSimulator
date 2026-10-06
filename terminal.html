@@ -773,7 +773,7 @@ function renderDesk(){
   document.getElementById('desk').innerHTML=d.map(s=>
     `<div class="deskrow"><span>${s.person===ST.me.person?'<b>'+esc(s.person)+'</b>':esc(s.person)}</span>
      <span class="dim" style="text-align:right">${s.roleLabel}${s.online?'':' <span class="dn">offline</span>'}</span></div>`).join('')
-    +`<div class="deskrow dim"><span>${d.length} ${d.length===1?'person':'people'}, ${held} of 14 seats covered</span><span></span></div>`;
+    +`<div class="deskrow dim"><span>${d.length} ${d.length===1?'person':'people'}, ${held} of 15 seats covered</span><span></span></div>`;
 
   // acting authority when the desk is short
   const w=document.getElementById('seatwarn');
